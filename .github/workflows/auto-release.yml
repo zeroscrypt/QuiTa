@@ -1,0 +1,115 @@
+name: Auto release
+
+# Publishes a release for every merge into main.
+#
+# The version is the tag chain: the next patch is derived from the newest
+# existing `v*` tag. Nothing in the repository has to be edited first, so the
+# bot can commit the bump without a human touching three files in three places.
+#
+# The build itself lives in release.yml — this workflow only decides *whether*
+# there is something to publish and under which tag.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump version and tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The commit this workflow pushes is itself a merge into main, which
+      # would start the whole cycle again. It is exactly the commit the tag
+      # points at, so comparing HEAD with the newest tag is enough to stop it.
+      - name: Nothing new to release?
+        id: check
+        run: |
+          latest="$(git tag --list 'v*' --sort=-v:refname | head -1)"
+          head="$(git rev-parse HEAD)"
+          echo "latest tag: ${latest:-none}"
+          echo "HEAD: $head"
+          if [ -n "$latest" ] && [ "$(git rev-list -n1 "$latest")" = "$head" ]; then
+            echo "HEAD is already released as $latest — nothing to do."
+            echo "todo=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "todo=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute next version
+        id: version
+        if: steps.check.outputs.todo == 'true'
+        run: |
+          set -euo pipefail
+          latest="$(git tag --list 'v*' --sort=-v:refname | head -1)"
+          current="${latest#v}"
+          if [ -z "$current" ]; then
+            current="$(node -p "require('./package.json').version")"
+          fi
+          next="$(node -e '
+            const [maj, min, pat] = process.argv[1].split(".").map(Number);
+            const pad = (n) => String(n).padStart(2, "0");
+            console.log(`${maj}.${min}.${pat + 1}`);
+          ' "$current")"
+          echo "releasing ${current} -> ${next}"
+          echo "tag=v${next}" >> "$GITHUB_OUTPUT"
+
+      # Written to the same three places a person would edit them by hand, so
+      # the repository never disagrees with what was published.
+      - name: Bump version in package.json, Cargo.toml and tauri.conf.json
+        if: steps.check.outputs.todo == 'true'
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.tag }}"
+          version="${tag#v}"
+          node -e '
+            const fs = require("fs");
+            const version = process.argv[1];
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            pkg.version = version;
+            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          ' "$version"
+          sed -i '' "s/^version = \".*\"/version = \"$version\"/" src-tauri/Cargo.toml
+          node -e '
+            const fs = require("fs");
+            const version = process.argv[1];
+            const path = "src-tauri/tauri.conf.json";
+            const conf = JSON.parse(fs.readFileSync(path, "utf8"));
+            conf.version = version;
+            fs.writeFileSync(path, JSON.stringify(conf, null, 2) + "\n");
+          ' "$version"
+          git diff --stat
+
+      - name: Commit and tag
+        if: steps.check.outputs.todo == 'true'
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
+          git commit -m "Версия $tag"
+          git push origin HEAD:main
+          git tag -a "$tag" -m "QuiTa $tag"
+          git push origin "$tag"
+
+      - name: Summarise
+        if: always()
+        run: |
+          if [ "${{ steps.check.outputs.todo }}" = "true" ]; then
+            echo "::notice::Тег ${{ steps.version.outputs.tag }} отправлен, релиз собирается."
+          else
+            echo "Новых изменений нет — релиз не создаётся."
+          fi
