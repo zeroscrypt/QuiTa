@@ -1,0 +1,232 @@
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  /* The window itself is a soft grey rather than pure white: a large white
+     surface glares on a bright screen, cards and inputs stay white on top. */
+  --bg-app: #f3f4f6;
+  --bg-secondary: #f6f7f9;
+  --bg-hover: #eef0f4;
+  --bg-active: #e6e9ef;
+  --border: #e0e2e7;
+  --text: #1c1e21;
+  --text-secondary: #6b7280;
+  --text-disabled: #a0a4ad;
+  --accent: #4c6fff;
+  --accent-hover: #3d5ce8;
+  --accent-soft: #eef1ff;
+  --accent-text: #ffffff;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --warning: #b45309;
+  --focus-ring: rgba(76, 111, 255, 0.35);
+  --checkbox-border: #c4c8d0;
+  /* The date field is the focus of the picker: one step lighter than the
+     rest of the panel so it reads as the primary control. */
+  --input-bg: #fdfdfe;
+  --input-bg-hover: #ffffff;
+  --shadow-menu: 0 8px 30px rgba(15, 18, 25, 0.14);
+  --shadow-dialog: 0 16px 48px rgba(15, 18, 25, 0.22);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #1d1e23;
+  --bg-app: #16171b;
+  --bg-secondary: #24262c;
+  --bg-hover: #2c2e36;
+  --bg-active: #353842;
+  --border: #33363f;
+  --text: #e5e7eb;
+  --text-secondary: #9ca3af;
+  --text-disabled: #6b7280;
+  --accent: #7d92ff;
+  --accent-hover: #93a4ff;
+  --accent-soft: #2a3157;
+  --accent-text: #14161c;
+  --danger: #f87171;
+  --danger-soft: #3a2226;
+  --warning: #fbbf24;
+  --focus-ring: rgba(125, 146, 255, 0.45);
+  --checkbox-border: #4b4e59;
+  --input-bg: #2e313a;
+  --input-bg-hover: #353945;
+  --shadow-menu: 0 8px 30px rgba(0, 0, 0, 0.5);
+  --shadow-dialog: 0 16px 48px rgba(0, 0, 0, 0.6);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, 'Noto Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* The root mount point must pass its height down, otherwise the app shell
+   cannot be a fixed-height flex column and the list would never scroll. */
+#app {
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+input {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 6px;
+}
+
+/* Custom checkbox — a square with a checkmark, matching the tray icon. */
+.checkbox {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--checkbox-border);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+  margin-top: 1px;
+}
+
+.checkbox:hover {
+  border-color: var(--accent);
+}
+
+.checkbox[aria-checked='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Completed, but work is still open below: the square keeps a filled look
+   and shows a dash instead of a check. */
+.checkbox.partial {
+  background: var(--warning);
+  border-color: var(--warning);
+}
+
+.checkbox svg {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.checkbox[aria-checked='true'] svg {
+  opacity: 1;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-active);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Icon button */
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  color: var(--text-secondary);
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.icon-button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.icon-button.danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Menu */
+.menu {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-menu);
+  padding: 4px;
+  min-width: 180px;
+  z-index: 100;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text);
+  background: none;
+}
+
+.menu-item:hover {
+  background: var(--bg-hover);
+}
+
+.menu-item.danger {
+  color: var(--danger);
+}
+
+.menu-item.danger:hover {
+  background: var(--danger-soft);
+}
+
+.menu-separator {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 6px;
+}

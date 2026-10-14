@@ -1,0 +1,135 @@
+name: Release
+
+# Builds installers for every supported platform and publishes them as a
+# GitHub Release. Triggered by pushing a version tag:
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# The tag name defines the release name, so the version in package.json,
+# Cargo.toml and tauri.conf.json must already match it.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to publish (e.g. v1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS (Apple Silicon)
+            os: macos-14
+            target: aarch64-apple-darwin
+          - name: macOS (Intel)
+            os: macos-14
+            target: x86_64-apple-darwin
+          - name: Windows
+            os: windows-latest
+            target: ''
+          - name: Linux
+            os: ubuntu-22.04
+            target: ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # A release without updater artifacts is still installable, it just
+      # cannot update itself. Say so instead of failing the build.
+      - name: Warn about a missing signing key
+        if: ${{ !secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set — the release"
+          echo "::warning::will have no latest.json and in-app updates will"
+          echo "::warning::stay silent. Add the secret to enable them."
+
+      # tauri-action builds the bundles and attaches them to one Release.
+      # Signing/notarization hooks go here once the secrets exist — see
+      # docs/DISTRIBUTION.md.
+      #
+      # `createUpdaterArtifacts` is switched on only here, not in
+      # tauri.conf.json: it makes `pnpm tauri build` fail on a machine without
+      # the signing key, and contributors must be able to build without secrets.
+      # This is what produces `latest.json` + `.sig`, which the in-app update
+      # banner reads.
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ inputs.tag || github.ref_name }}
+          releaseName: QuiTa ${{ inputs.tag || github.ref_name }}
+          releaseBody: See CHANGELOG and docs/DISTRIBUTION.md for install
+            instructions.
+          releaseDraft: false
+          prerelease: false
+          args: >-
+            ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+            --config '{"bundle":{"createUpdaterArtifacts":true}}' 
+
+  checksums:
+    name: Checksums
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: '*'
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS
+
+      # The installer scripts refuse to trust a binary whose hash is missing
+      # from this file, so it must cover every artifact.
+      - name: Upload checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: gh release upload "$TAG" dist/SHA256SUMS --clobber

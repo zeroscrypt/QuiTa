@@ -1,0 +1,41 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+
+# Svelte / Vite caches
+.svelte-kit
+.vite
+
+# Rust
+src-tauri/target
+src-tauri/gen
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# QuiTa local database
+*.db
+*.db-shm
+*.db-wal
+
+# Signing keys and secrets — must never reach the repository
+*.key
+*.key.pub
+*.pem
+*.p12
+*.pfx
+*.sig

@@ -1,0 +1,18 @@
+<!--
+  QuiTa tray / menu bar icon.
+
+  macOS template image: only the alpha channel matters, the system renders it
+  in the correct colour for light and dark menu bars, so everything here is
+  pure black. Keep the artwork inside the 22×22 menu bar grid.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
+  <rect
+    x="2.5" y="2.5" width="17" height="17" rx="4.25"
+    fill="none" stroke="#000" stroke-width="1.5"
+  />
+  <path
+    d="M6.9 11.3 9.6 14 15.1 8.2"
+    fill="none" stroke="#000" stroke-width="1.9"
+    stroke-linecap="round" stroke-linejoin="round"
+  />
+</svg>

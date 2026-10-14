@@ -1,0 +1,923 @@
+/* ===== Layout ===== */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-app);
+}
+
+.content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 14px 8px;
+}
+
+.loading {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+/* ===== Header ===== */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 8px;
+  flex: none;
+  cursor: default;
+}
+
+.app-title {
+  font-weight: 650;
+  font-size: 15px;
+  letter-spacing: 0.2px;
+  flex: none;
+  /* A slightly wider hit area than the text itself, so the double click does
+     not demand pixel accuracy. */
+  padding: 3px 6px;
+  margin-left: -6px;
+  border-radius: 6px;
+  /* The header is a drag region; this must stay a plain text cursor or the
+     resize affordance is invisible. */
+  cursor: default;
+  user-select: none;
+}
+
+.settings-button {
+  flex: none;
+}
+
+/* Header actions: expand/collapse and "jump to newest". */
+.header-button {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.header-button:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ===== Search ===== */
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.search-icon {
+  color: var(--text-secondary);
+  flex: none;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 14px;
+}
+
+.search-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+/* ===== Task list ===== */
+
+.task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 10px;
+  padding: 5px 6px 5px 6px;
+  transition: background 100ms ease;
+}
+
+.task-row:hover {
+  background: var(--bg-hover);
+}
+
+/* Left cluster: add-subtask button + checkbox, always on one line. */
+.task-lead {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+}
+
+.task-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: 6px;
+}
+
+.task-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  cursor: default;
+}
+
+.task-row.completed .task-title {
+  color: var(--text-disabled);
+  text-decoration: line-through;
+  text-decoration-color: var(--text-disabled);
+}
+
+/* Partially done: the parent is closed, but subtasks remain open. The title
+   is deliberately NOT struck through — the task itself is not fully done. */
+.task-row.partial .task-title {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.task-row.partial {
+  background: color-mix(in srgb, var(--warning) 7%, transparent);
+}
+
+/* Overdue: red title plus a faint red wash on the row, so it is obvious in
+   a long list without shouting. Completed tasks stay muted. */
+.task-title.overdue {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.task-row.overdue .task-title.overdue {
+  color: var(--danger);
+}
+
+.task-row.overdue {
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
+}
+
+.task-row.completed .task-title.overdue,
+.task-row.completed.task-row.overdue {
+  color: var(--text-disabled);
+  background: transparent;
+}
+
+.task-actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex: none;
+  opacity: 0.4;
+  transition: opacity 100ms ease;
+}
+
+.task-row:hover .task-actions,
+.task-row:focus-within .task-actions {
+  opacity: 1;
+}
+
+/* Delete is hidden until the row is hovered/focused, to keep the list quiet. */
+.task-actions .delete-trigger {
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.task-row:hover .delete-trigger,
+.task-row:focus-within .delete-trigger {
+  opacity: 1;
+}
+
+/* The comment icon is an affordance, not data: it appears on hover —
+   unless the task actually has a comment, which must stay visible. */
+.task-actions .comment-trigger {
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.task-row:hover .comment-trigger,
+.task-row:focus-within .comment-trigger {
+  opacity: 1;
+}
+
+.task-actions .comment-trigger.filled {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.task-actions .comment-trigger[aria-expanded='true'] {
+  opacity: 1;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.task-actions .delete-trigger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.task-lead .icon-button {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  opacity: 0.55;
+}
+
+.task-row:hover .task-lead .icon-button,
+.task-lead .icon-button:focus-visible {
+  opacity: 1;
+}
+
+.chevron {
+  transition: transform 150ms ease;
+}
+
+.chevron.expanded {
+  transform: rotate(180deg);
+}
+
+/* Calendar button: highlighted once a due date exists. */
+.task-actions .icon-button.has-due {
+  color: var(--accent);
+}
+
+.due-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 7px;
+  flex: none;
+}
+
+.due-badge:hover {
+  background: var(--bg-active);
+}
+
+/* No due date yet: the same chip, muted and revealed on hover so the list
+   stays quiet until the row is touched. */
+.due-badge.empty {
+  color: var(--text-disabled);
+  background: transparent;
+  border-style: dashed;
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.task-row:hover .due-badge.empty,
+.task-row:focus-within .due-badge.empty {
+  opacity: 1;
+}
+
+.due-badge.empty:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  border-style: solid;
+  background: var(--accent-soft);
+  opacity: 1;
+}
+
+.due-badge.overdue {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.progress-badge {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 6px;
+  padding: 2px 7px;
+  flex: none;
+}
+
+/* ===== Drag & drop feedback ===== */
+
+.task-row {
+  position: relative;
+}
+
+/* Nesting zone: the middle half of a row accepts the dropped task. */
+.task-row.drop-hover {
+  background: var(--accent-soft);
+  outline: 1px dashed var(--accent);
+  outline-offset: -1px;
+}
+
+.task-row.drop-armed {
+  background: var(--accent-soft);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.task-row.dragging {
+  opacity: 0.35;
+}
+
+/* Row that owns the currently open popover (date picker, menu). */
+.task-row.popover-open {
+  background: var(--accent-soft);
+}
+
+/* ===== Subtasks ===== */
+
+.subtasks {
+  margin: 2px 0 2px 32px;
+  padding-left: 10px;
+  border-left: 1.5px solid var(--border);
+}
+
+.add-subtask-form {
+  margin: 2px 0 2px 32px;
+  padding-left: 29px;
+}
+
+.add-subtask-form input {
+  width: 100%;
+  padding: 6px 9px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  font-size: 13px;
+}
+
+.add-subtask-form input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* Reminds what Enter and Escape do while the storm field is open. */
+.add-subtask-hint {
+  margin: -1px 0 2px;
+  padding-left: 41px;
+  font-size: 11px;
+  color: var(--text-disabled);
+}
+
+.menu-anchor {
+  position: relative;
+  z-index: 50;
+}
+
+/* Popovers are positioned in viewport coordinates: the list is a scroll
+   container, so absolutely positioned menus would be clipped by it. */
+.menu-floating,
+.due-popover-floating {
+  position: fixed;
+  z-index: 120;
+}
+
+.due-popover-floating {
+  position: fixed;
+  z-index: 120;
+}
+
+/* Comment popover shares the floating surface with the date picker. */
+.comment-popover {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-menu);
+  padding: 12px;
+}
+
+.comment-popover-floating {
+  position: fixed;
+  z-index: 120;
+}
+
+/* ===== Inline edit ===== */
+
+.inline-edit {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 7px;
+  margin-left: -7px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent);
+  border-radius: 7px;
+  outline: none;
+  font-size: 14px;
+}
+
+/* ===== Add form (bottom quick-add) ===== */
+
+.add-form {
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--border);
+  flex: none;
+}
+
+.add-form input {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  font-size: 14px;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.add-form input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.add-form input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.field-error {
+  padding: 0 16px 8px;
+  font-size: 12.5px;
+  color: var(--danger);
+  flex: none;
+}
+
+/* ===== Due date popover ===== */
+
+.due-popover {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-menu);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 200px;
+}
+
+.due-popover input[type='date'] {
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  outline: none;
+  font-size: 13px;
+  color-scheme: inherit;
+}
+
+.due-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.due-quick {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.quick-chip {
+  padding: 4px 10px;
+  font-size: 12.5px;
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.quick-chip:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.quick-chip.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 550;
+}
+
+/* Auto-delete retention popover */
+.popover-title {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.days-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.days-input {
+  width: 72px;
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  outline: none;
+  font-size: 13px;
+}
+
+.days-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.days-suffix {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.popover-hint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.due-hint {
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* ===== Empty state ===== */
+
+.empty-state {
+  padding: 56px 20px;
+  text-align: center;
+}
+
+.empty-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.empty-hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  font-family: inherit;
+  font-size: 11.5px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+}
+
+/* ===== Dialogs ===== */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 12, 18, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.dialog {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-dialog);
+  padding: 18px;
+  width: min(360px, calc(100vw - 48px));
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog-title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.dialog-message {
+  margin: 0 0 16px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.button {
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 550;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.button.secondary {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+}
+
+.button.secondary:hover {
+  background: var(--bg-active);
+}
+
+.button.danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.button.danger:hover {
+  filter: brightness(1.08);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.button.wide {
+  width: 100%;
+}
+
+.link {
+  color: var(--accent);
+  font-size: 13px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.link:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.link:disabled {
+  color: var(--text-disabled);
+  pointer-events: none;
+}
+
+/* Primary action inside popovers. Declared after `.link:hover` so the accent
+   fill is never replaced by the muted hover background. */
+.link.primary:not(:disabled) {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 550;
+}
+
+.link.primary:not(:disabled):hover {
+  background: var(--accent-hover);
+  color: var(--accent-text);
+}
+
+/* ===== Settings ===== */
+
+.settings-dialog {
+  width: min(430px, calc(100vw - 48px));
+  /* Tabs + scrolling body need a height budget of their own. */
+  max-height: calc(100vh - 64px);
+  flex-direction: column;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.settings-header .dialog-title {
+  margin: 0;
+}
+
+.settings-section {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.settings-section:first-of-type {
+  border-top: none;
+}
+
+.settings-label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+}
+
+.settings-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.segmented {
+  display: inline-flex;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.segment {
+  padding: 5px 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.segment:hover {
+  color: var(--text);
+}
+
+.segment.active {
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  font-weight: 550;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+/* Label + info icon; the icon is a button, so the row itself keeps the
+   pointer cursor only on the text part. */
+.toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  transition: background 150ms ease;
+  flex: none;
+}
+
+.switch[aria-checked='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 150ms ease;
+}
+
+.switch[aria-checked='true'] .switch-thumb {
+  transform: translateX(16px);
+}
+
+.deleted-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Recycle bin grouped by the tab the tasks came from. */
+.deleted-group + .deleted-group {
+  margin-top: 12px;
+}
+
+.deleted-group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 2px;
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--text-secondary);
+}
+
+.deleted-group-count {
+  margin-left: auto;
+  font-weight: 500;
+  color: var(--text-disabled);
+}
+
+.deleted-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.deleted-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.deleted-row + .deleted-row {
+  border-top: 1px solid var(--border);
+}
+
+.deleted-title {
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ===== Toasts ===== */
+
+.toasts {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 300;
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--text);
+  color: var(--bg);
+  font-size: 12.5px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  box-shadow: var(--shadow-menu);
+  max-width: min(420px, calc(100vw - 32px));
+  overflow-wrap: anywhere;
+}
+
+.toast.error {
+  background: var(--danger);
+  color: #fff;
+}

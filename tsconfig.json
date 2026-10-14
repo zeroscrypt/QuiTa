@@ -1,0 +1,41 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "preserve",
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+
+    "types": ["vite/client"],
+
+    "baseUrl": ".",
+    "paths": {
+      "$lib": ["src/lib"],
+      "$lib/*": ["src/lib/*"],
+      "$domain": ["src/domain"],
+      "$domain/*": ["src/domain/*"],
+      "$services": ["src/services"],
+      "$services/*": ["src/services/*"],
+      "$stores": ["src/stores"],
+      "$stores/*": ["src/stores/*"],
+      "$components": ["src/components"],
+      "$components/*": ["src/components/*"],
+      "$i18n": ["src/i18n/index.svelte.ts"],
+      "$i18n/*": ["src/i18n/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.svelte", "tests/**/*.ts", "vite.config.ts"]
+}

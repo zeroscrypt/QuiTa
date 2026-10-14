@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Minimal capabilities for the QuiTa main window. The global shortcut is registered from Rust, so the webview needs no shortcut permissions; the only plugin calls from the UI are the save and open dialogs and the update check.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "dialog:allow-save",
+    "dialog:allow-open",
+    "updater:default"
+  ]
+}
