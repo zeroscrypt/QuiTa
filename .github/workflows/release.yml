@@ -176,8 +176,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Explicit bash: the default shell on a Windows runner is PowerShell,
+      # which cannot parse `set -euo pipefail` or `[ ... ]`.
       - name: Resolve the tag being published
         id: tag
+        shell: bash
         run: |
           set -euo pipefail
           tag="${{ needs.version.outputs.tag || inputs.tag }}"
