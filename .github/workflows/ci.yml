@@ -52,6 +52,13 @@ jobs:
         with:
           workspaces: src-tauri
 
+      # Tauri's Linux dependencies are needed to *build* the crate at all, not
+      # only to bundle it: without them `glib-sys` fails in its build script.
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
       - name: Format check
         run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 

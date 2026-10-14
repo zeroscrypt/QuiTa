@@ -88,11 +88,12 @@ jobs:
       # Signing/notarization hooks go here once the secrets exist — see
       # docs/DISTRIBUTION.md.
       #
-      # `createUpdaterArtifacts` is switched on only here, not in
-      # tauri.conf.json: it makes `pnpm tauri build` fail on a machine without
-      # the signing key, and contributors must be able to build without secrets.
-      # This is what produces `latest.json` + `.sig`, which the in-app update
-      # banner reads.
+      # Updater artifacts are switched on only here, via a separate config file
+      # instead of tauri.conf.json: the flag makes `pnpm tauri build` fail on a
+      # machine without the signing key, and contributors must be able to build
+      # without any secret. This is what produces `latest.json` + `.sig`, which
+      # the in-app update banner reads. The JSON lives in a file because nested
+      # quotes inside YAML break the workflow parser.
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -105,9 +106,7 @@ jobs:
             instructions.
           releaseDraft: false
           prerelease: false
-          args: >-
-            ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
-            --config '{"bundle":{"createUpdaterArtifacts":true}}' 
+          args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }} --config src-tauri/tauri.updater.conf.json
 
   checksums:
     name: Checksums
