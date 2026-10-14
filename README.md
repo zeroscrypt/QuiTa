@@ -21,11 +21,6 @@ English · **[Русский](README.ru.md)**
 
 ---
 
-> This whole file is a task list in the same shape QuiTa shows them.
-> `- [x]` — done, `- [ ]` — ahead, `◐` — done partially.
-
----
-
 ## 🔵 What this is
 
 Every task manager offers **planning**. QuiTa offers **capture**.
