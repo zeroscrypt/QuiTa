@@ -1,5 +1,4 @@
 {
-  "$comment": "Overrides merged into tauri.conf.json by the release workflow only. Kept as a file because embedding this JSON in YAML needs nested quotes that GitHub's workflow parser can choke on.",
   "bundle": {
     "createUpdaterArtifacts": true
   }
