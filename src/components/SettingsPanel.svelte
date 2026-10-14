@@ -23,6 +23,8 @@
 
   let active = $state<TabId>('interface');
   let purgeConfirm = $state<{ id: string; title: string } | null>(null);
+  let purgeAllConfirm = $state(false);
+  let purging = $state(false);
   let purgeResult = $state<string | null>(null);
 
   onMount(() => {
@@ -144,19 +146,42 @@
     await refreshAfterPurge();
   }
 
+  /**
+   * Empties the recycle bin.
+   *
+   * The row count is re-read from the database afterwards instead of trusting
+   * the number the command reported: a silent no-op that still says "done" is
+   * worse than a visible failure, and this is the one irreversible action in
+   * the app.
+   */
   async function purgeAll() {
+    if (purging) return;
+    purging = true;
+    purgeAllConfirm = false;
     purgeResult = null;
     dbStore.error = null;
+    let removed = 0;
     try {
-      // The backend reports how many rows it really removed, so the result
-      // is verifiable instead of a bare success message.
-      const removed = await taskService.purgeAllDeleted();
-      purgeResult = t('settings.purgeAllDone', { count: String(removed) });
+      removed = await taskService.purgeAllDeleted();
     } catch (e) {
-      // Never fail silently: the button would look broken.
       dbStore.error = e instanceof Error ? e.message : String(e);
     }
-    await refreshAfterPurge();
+
+    try {
+      await refreshAfterPurge();
+    } catch (e) {
+      // A failed refresh must not hide the result of the deletion itself.
+      dbStore.error ??= e instanceof Error ? e.message : String(e);
+    }
+
+    // Whatever happened, the state on screen must match the database.
+    const stillThere = taskStore.deleted.length;
+    if (stillThere > 0) {
+      dbStore.error ??= t('settings.purgeAllFailed', { count: String(stillThere) });
+    } else if (!dbStore.error) {
+      purgeResult = t('settings.purgeAllDone', { count: String(removed) });
+    }
+    purging = false;
   }
 
   /** One place that re-reads everything affected by a purge. */
@@ -509,8 +534,12 @@
               <span class="settings-hint">
                 {t('settings.deletedCount').replace('{count}', String(deleted.length))}
               </span>
-              <button class="link danger" onclick={() => void purgeAll()}>
-                {t('settings.purgeAll')}
+              <button
+                class="link danger"
+                disabled={purging}
+                onclick={() => (purgeAllConfirm = true)}
+              >
+                {purging ? t('settings.purging') : t('settings.purgeAll')}
               </button>
             </div>
             {#each deletedGroups as group (group.key)}
@@ -572,6 +601,24 @@
     </div>
   </div>
 </div>
+
+{#if purgeAllConfirm}
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div class="backdrop" onclick={() => (purgeAllConfirm = false)} role="presentation">
+    <div class="dialog" role="alertdialog" aria-modal="true">
+      <h2 class="dialog-title">{t('delete.title')}</h2>
+      <p class="dialog-message">{t('settings.purgeAllConfirm', { count: String(deleted.length) })}</p>
+      <div class="dialog-actions">
+        <button class="button secondary" onclick={() => (purgeAllConfirm = false)}>
+          {t('delete.cancel')}
+        </button>
+        <button class="button danger" onclick={() => void purgeAll()}>
+          {t('settings.purgeAll')}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 {#if purgeConfirm}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->

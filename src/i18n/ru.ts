@@ -168,6 +168,9 @@ export const ru: Record<string, string> = {
   'settings.deletedChildrenMany': '{count} подзадач',
   'settings.deletedSubtask': 'подзадача · ',
   'settings.trashNote': 'Восстановление родительской задачи вернёт и её подзадачи. Подзадача, восстановленная отдельно, станет корневой задачей.',
+  'settings.purgeAllConfirm': 'В корзине {count}. Удалить всё без возможности восстановления?',
+  'settings.purgeAllFailed': 'Корзина не очищена: удалить не удалось, осталось {count}',
+  'settings.purging': 'Очистка…',
   'settings.purgeAllDone': 'Корзина очищена — удалено {count}',
   'settings.exportFailed': 'Не удалось экспортировать: {reason}',
   'settings.dataHint':
