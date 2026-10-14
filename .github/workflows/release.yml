@@ -84,14 +84,6 @@ jobs:
       # build without any secret. This produces latest.json and the .sig files
       # that the in-app update banner reads.
       #
-      # A release without them is still installable, it just cannot update
-      # itself, so a missing secret is a warning rather than a failure.
-      - name: Warn about a missing signing key
-        if: ${{ !secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: |
-          echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set: the release"
-          echo "::warning::will have no latest.json and in-app updates stay silent"
-
       - name: Build and publish
         uses: tauri-apps/tauri-action@v0
         env:
