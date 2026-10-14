@@ -220,6 +220,10 @@ jobs:
     if: always() && (needs.version.outputs.tag != '' || inputs.tag != '')
     runs-on: ubuntu-latest
     steps:
+      # `gh release download` resolves the repository through git, so this job
+      # fails without a checkout even though it touches no source file.
+      - uses: actions/checkout@v4
+
       - name: Resolve the tag
         id: tag
         run: echo "tag=${{ needs.version.outputs.tag || inputs.tag }}" >> "$GITHUB_OUTPUT"
