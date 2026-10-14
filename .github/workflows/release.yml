@@ -1,20 +1,23 @@
 name: Release
 
 # Builds installers for every supported platform and publishes them as a
-# GitHub Release. Triggered by pushing a version tag:
+# single GitHub Release.
+#
+# Triggered by pushing a version tag:
 #
 #   git tag v1.0.0 && git push origin v1.0.0
 #
-# The tag name defines the release name, so the version in package.json,
-# Cargo.toml and tauri.conf.json must already match it.
+# The version in package.json, Cargo.toml and tauri.conf.json must already
+# match the tag.
 
 on:
   push:
-    tags: ['v*']
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing tag to publish (e.g. v1.0.0)'
+        description: "Existing tag to publish (e.g. v1.0.0)"
         required: true
 
 permissions:
@@ -40,10 +43,10 @@ jobs:
             target: x86_64-apple-darwin
           - name: Windows
             os: windows-latest
-            target: ''
+            target: ""
           - name: Linux
             os: ubuntu-22.04
-            target: ''
+            target: ""
     steps:
       - uses: actions/checkout@v4
 
@@ -75,26 +78,22 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # A release without updater artifacts is still installable, it just
-      # cannot update itself. Say so instead of failing the build.
-      - name: Warn about a missing signing key
-        if: ${{ !secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: |
-          echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set — the release"
-          echo "::warning::will have no latest.json and in-app updates will"
-          echo "::warning::stay silent. Add the secret to enable them."
-
-      # tauri-action builds the bundles and attaches them to one Release.
-      # Signing/notarization hooks go here once the secrets exist — see
-      # docs/DISTRIBUTION.md.
+      # Updater artifacts are enabled through a separate config file rather
+      # than tauri.conf.json: the flag makes a local `pnpm tauri build` fail on
+      # a machine that has no signing key, and contributors must be able to
+      # build without any secret. This produces latest.json and the .sig files
+      # that the in-app update banner reads.
       #
-      # Updater artifacts are switched on only here, via a separate config file
-      # instead of tauri.conf.json: the flag makes `pnpm tauri build` fail on a
-      # machine without the signing key, and contributors must be able to build
-      # without any secret. This is what produces `latest.json` + `.sig`, which
-      # the in-app update banner reads. The JSON lives in a file because nested
-      # quotes inside YAML break the workflow parser.
-      - uses: tauri-apps/tauri-action@v0
+      # A release without them is still installable, it just cannot update
+      # itself, so a missing secret is a warning rather than a failure.
+      - name: Warn about a missing signing key
+        if: ${{ env.TAURI_SIGNING_PRIVATE_KEY == '' }}
+        run: |
+          echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set: the release"
+          echo "::warning::will have no latest.json and in-app updates stay silent"
+
+      - name: Build and publish
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -102,8 +101,7 @@ jobs:
         with:
           tagName: ${{ inputs.tag || github.ref_name }}
           releaseName: QuiTa ${{ inputs.tag || github.ref_name }}
-          releaseBody: See CHANGELOG and docs/DISTRIBUTION.md for install
-            instructions.
+          releaseBody: See docs/DISTRIBUTION.md for install instructions.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }} --config src-tauri/tauri.updater.conf.json
@@ -118,7 +116,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: dist
-          pattern: '*'
+          pattern: "*"
           merge-multiple: true
 
       - name: Generate SHA256SUMS
