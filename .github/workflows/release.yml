@@ -1,35 +1,130 @@
 name: Release
 
-# Builds installers for every supported platform and publishes them as a
-# single GitHub Release.
+# One workflow from merge to installers.
 #
-# Triggered by pushing a version tag:
+#   merge into main → next patch version → tag vX.Y.Z → build → GitHub Release
 #
-#   git tag v1.0.0 && git push origin v1.0.0
+# Everything happens inside a single run on purpose. An earlier design had a
+# bot push the tag and a second workflow build from it, which never fired:
+# GitHub deliberately does not start a workflow run from actions performed
+# with the repository's own GITHUB_TOKEN, to keep tokens from recursing. The
+# alternative — a personal access token — would mean another long-lived secret
+# in the repository. Building in the same run needs neither.
 #
-# The version in package.json, Cargo.toml and tauri.conf.json must already
-# match the tag.
+# The version comes from the tag chain, so no file has to be edited by hand
+# before a release, and the repository can never disagree with what shipped.
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
+    # A pull request that only touched documentation produces no binary, so it
+    # produces no release and no update prompt for people who never open the
+    # README.
+    paths-ignore:
+      - "**/*.md"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing tag to publish (e.g. v1.0.0)"
-        required: true
+        description: "Existing tag to publish (e.g. v1.0.0). Leave empty to release the current main."
+        required: false
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
+  version:
+    # The version commit is itself a push into main, which would restart this
+    # workflow. Filtering the bot at the job level stops the loop at the source;
+    # the tag comparison below is the second line of defence.
+    if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
+    name: Decide the version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check whether there is something to release
+        id: check
+        run: |
+          set -euo pipefail
+          latest="$(git tag --list 'v*' --sort=-v:refname | head -1)"
+          head="$(git rev-parse HEAD)"
+          echo "newest tag: ${latest:-none}"
+          echo "HEAD:       $head"
+          if [ -n "$latest" ] && [ "$(git rev-list -n1 "$latest")" = "$head" ]; then
+            echo "HEAD is already released as $latest — nothing to do."
+            echo "todo=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "todo=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute next version
+        id: version
+        if: steps.check.outputs.todo == 'true'
+        run: |
+          set -euo pipefail
+          latest="$(git tag --list 'v*' --sort=-v:refname | head -1)"
+          if [ -n "$latest" ]; then
+            current="${latest#v}"
+          else
+            current="$(node -p "require('./package.json').version")"
+          fi
+          next="$(node --input-type=module -e '
+            const [major, minor, patch] = process.argv[1].split(".").map(Number);
+            if ([major, minor, patch].some(Number.isNaN)) {
+              console.error("cannot parse " + process.argv[1]); process.exit(1);
+            }
+            console.log(`${major}.${minor}.${patch + 1}`);
+          ' "$current")"
+          echo "releasing ${current} → ${next}"
+          echo "tag=v${next}" >> "$GITHUB_OUTPUT"
+
+      # Written to the same three files a person would edit by hand, so the
+      # repository can never disagree with what was published.
+      - name: Bump version
+        if: steps.check.outputs.todo == 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: node scripts/bump-version.mjs "$TAG"
+
+      # The updater compares the version in the binary with the one in the
+      # release manifest. If they ever disagree the banner silently stops
+      # appearing, so the bump is verified rather than trusted.
+      - name: Verify the bump
+        if: steps.check.outputs.todo == 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: node scripts/bump-version.mjs --check "$TAG"
+
+      - name: Commit and tag
+        if: steps.check.outputs.todo == 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
+          git commit -m "Версия $TAG"
+          # Something else may have merged while this job ran.
+          git pull --rebase origin main
+          git push origin HEAD:main
+          git tag -a "$TAG" -m "QuiTa $TAG"
+          git push origin "$TAG"
+
   build:
     name: ${{ matrix.name }}
+    needs: version
+    # `always()` because the version job is skipped for a manual run; when
+    # neither the job nor the input names a tag there is simply nothing to do.
+    if: always() && (needs.version.outputs.tag != '' || inputs.tag != '')
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -49,6 +144,9 @@ jobs:
             target: ""
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag || inputs.tag }}
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -78,12 +176,27 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Resolve the tag being published
+        id: tag
+        run: |
+          set -euo pipefail
+          tag="${{ needs.version.outputs.tag || inputs.tag }}"
+          version="${tag#v}"
+          found="$(node -p "require('./package.json').version")"
+          if [ "$found" != "$version" ]; then
+            echo "::error::The checkout says $found but the tag says $version."
+            exit 1
+          fi
+          echo "Publishing $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
       # Updater artifacts are enabled through a separate config file rather
       # than tauri.conf.json: the flag makes a local `pnpm tauri build` fail on
       # a machine that has no signing key, and contributors must be able to
       # build without any secret. This produces latest.json and the .sig files
-      # that the in-app update banner reads.
-      #
+      # that the in-app update banner reads. A release built without the
+      # signing secret is still installable; it just has no latest.json, so the
+      # app will not offer an update. Check for that file in the release.
       - name: Build and publish
         uses: tauri-apps/tauri-action@v0
         env:
@@ -91,8 +204,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ inputs.tag || github.ref_name }}
-          releaseName: QuiTa ${{ inputs.tag || github.ref_name }}
+          tagName: ${{ steps.tag.outputs.tag }}
+          releaseName: QuiTa ${{ steps.tag.outputs.tag }}
           releaseBody: See docs/DISTRIBUTION.md for install instructions.
           releaseDraft: false
           prerelease: false
@@ -100,9 +213,14 @@ jobs:
 
   checksums:
     name: Checksums
-    needs: build
+    needs: [version, build]
+    if: always() && (needs.version.outputs.tag != '' || inputs.tag != '')
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve the tag
+        id: tag
+        run: echo "tag=${{ needs.version.outputs.tag || inputs.tag }}" >> "$GITHUB_OUTPUT"
+
       # tauri-action uploads the installers straight to the GitHub Release, not
       # as workflow artifacts — so they have to be downloaded back from there.
       # `actions/download-artifact` finds nothing and silently skips creating
@@ -110,7 +228,7 @@ jobs:
       - name: Download release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.ref_name }}
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
           mkdir -p dist
           gh release download "$TAG" --dir dist --pattern "QuiTa_*"
@@ -124,5 +242,5 @@ jobs:
       - name: Upload checksums
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.ref_name }}
+          TAG: ${{ steps.tag.outputs.tag }}
         run: gh release upload "$TAG" dist/SHA256SUMS --clobber
