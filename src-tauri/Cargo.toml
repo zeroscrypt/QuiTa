@@ -1,6 +1,6 @@
 [package]
 name = "quita"
-version = "1.0.2"
+version = "1.0.3"
 description = "QuiTa — lightweight cross-platform task manager"
 authors = ["zeroscrypt"]
 license = "MIT"
