@@ -87,7 +87,7 @@ jobs:
       # A release without them is still installable, it just cannot update
       # itself, so a missing secret is a warning rather than a failure.
       - name: Warn about a missing signing key
-        if: ${{ env.TAURI_SIGNING_PRIVATE_KEY == '' }}
+        if: ${{ !secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
           echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set: the release"
           echo "::warning::will have no latest.json and in-app updates stay silent"
