@@ -1,0 +1,126 @@
+import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+/**
+ * The auto-release workflow bumps the version in three files and tags the
+ * commit. If those files ever disagree, the updater compares the version in
+ * the binary with the one in the release manifest, finds nothing newer, and
+ * the green banner simply stops appearing — no error, just silence. That is
+ * expensive to debug later, so it is checked here instead.
+ */
+
+const SCRIPT = join(process.cwd(), 'scripts', 'bump-version.mjs');
+
+function makeProject(version: string): string {
+  const dir = mkdtempSync(join(tmpdir(), 'quita-version-'));
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'x', version }, null, 2) + '\n');
+  mkdirSync(join(dir, 'src-tauri'));
+  writeFileSync(
+    join(dir, 'src-tauri', 'tauri.conf.json'),
+    JSON.stringify({ version, productName: 'QuiTa' }, null, 2) + '\n',
+  );
+  writeFileSync(
+    join(dir, 'src-tauri', 'Cargo.toml'),
+    `[package]\nname = "quita"\nversion = "${version}"\nedition = "2021"\n`,
+  );
+  return dir;
+}
+
+function readVersion(dir: string): Record<string, string> {
+  const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+  const conf = JSON.parse(readFileSync(join(dir, 'src-tauri', 'tauri.conf.json'), 'utf8'));
+  const cargo = readFileSync(join(dir, 'src-tauri', 'Cargo.toml'), 'utf8');
+  return {
+    package: pkg.version,
+    tauri: conf.version,
+    cargo: /version = "([^"]+)"/.exec(cargo)?.[1] ?? '',
+  };
+}
+
+function run(dir: string, ...args: string[]): string {
+  // Without the override the script would edit the real repository, which is
+  // exactly the accident this arrangement prevents.
+  return execFileSync('node', [SCRIPT, ...args], {
+    cwd: dir,
+    encoding: 'utf8',
+    env: { ...process.env, QUITA_PROJECT_ROOT: dir },
+  });
+}
+
+describe('bump-version', () => {
+  it('raises the version in all three files at once', () => {
+    const dir = makeProject('1.0.0');
+    try {
+      run(dir, '1.0.1');
+      expect(readVersion(dir)).toEqual({ package: '1.0.1', tauri: '1.0.1', cargo: '1.0.1' });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts a tag with a leading v', () => {
+    // The workflow passes the tag straight through; stripping `v` in shell
+    // quoting is exactly the kind of thing that breaks on a different runner.
+    const dir = makeProject('1.0.0');
+    try {
+      run(dir, 'v2.0.0');
+      expect(readVersion(dir)).toEqual({ package: '2.0.0', tauri: '2.0.0', cargo: '2.0.0' });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves everything alone when the version already matches', () => {
+    const dir = makeProject('1.0.1');
+    try {
+      const before = readFileSync(join(dir, 'package.json'), 'utf8');
+      const output = run(dir, '1.0.1');
+      expect(output).toContain('already set');
+      expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(before);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('never changes files in --check mode', () => {
+    const dir = makeProject('1.0.0');
+    try {
+      const before = readFileSync(join(dir, 'package.json'), 'utf8');
+      run(dir, '--check', '1.0.1');
+      expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(before);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the rest of each file intact', () => {
+    // A rewrite that reformats Cargo.toml would produce a noisy diff and could
+    // break the package metadata cargo reads.
+    const dir = makeProject('1.0.0');
+    try {
+      run(dir, '1.0.1');
+      const cargo = readFileSync(join(dir, 'src-tauri', 'Cargo.toml'), 'utf8');
+      expect(cargo).toContain('name = "quita"');
+      expect(cargo).toContain('edition = "2021"');
+      const conf = JSON.parse(readFileSync(join(dir, 'src-tauri', 'tauri.conf.json'), 'utf8'));
+      expect(conf.productName).toBe('QuiTa');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses anything that is not a plain X.Y.Z', () => {
+    const dir = makeProject('1.0.0');
+    try {
+      expect(() => run(dir, '1.0')).toThrow();
+      expect(() => run(dir, 'v1.0.0-rc.1')).toThrow();
+      expect(() => run(dir, 'latest')).toThrow();
+      expect(readVersion(dir)).toEqual({ package: '1.0.0', tauri: '1.0.0', cargo: '1.0.0' });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
