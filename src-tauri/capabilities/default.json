@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Minimal capabilities for the QuiTa main window. The global shortcut is registered from Rust, so the webview needs no shortcut permissions; the only plugin calls from the UI are the save and open dialogs and the update check.",
+  "description": "Minimal capabilities for the QuiTa main window. The global shortcut is registered from Rust, so the webview needs no shortcut permissions. The plugin surface is deliberately tiny: save/open dialogs for export and import, the update check, a restart after installing an update, and opening the project URL on GitHub — the opener is scoped to that one repository, not to every https URL.",
   "windows": [
     "main"
   ],
@@ -9,6 +9,15 @@
     "core:default",
     "dialog:allow-save",
     "dialog:allow-open",
-    "updater:default"
+    "updater:default",
+    "process:allow-restart",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://github.com/zeroscrypt/QuiTa*"
+        }
+      ]
+    }
   ]
 }

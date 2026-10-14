@@ -12,7 +12,7 @@
 | Набор | Команда | Тестов |
 |-------|---------|--------|
 | Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 18 |
-| Rust integration | то же | 72 |
+| Rust integration | то же | 74 |
 | TypeScript | `pnpm test` | 107 |
 
 Обе платформы проверены сборкой и запуском:

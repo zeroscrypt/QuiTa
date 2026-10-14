@@ -1433,10 +1433,14 @@ pub fn import_tasks(
     ordered.sort_by_key(|t| t.parent_id.is_some());
 
     for task in ordered {
-        if task.title.trim().is_empty() {
+        // An imported title is untrusted input: it must obey the same limit as
+        // a typed one, or a hostile file could put megabytes into a single row
+        // and blow the layout apart.
+        let title = validation::normalize_title(&task.title);
+        let Some(title) = title.filter(|s| s.chars().count() <= validation::MAX_TITLE_CHARS) else {
             skipped += 1;
             continue;
-        }
+        };
         let parent_ok = match &task.parent_id {
             Some(pid) => tx
                 .query_row(
@@ -1490,7 +1494,7 @@ pub fn import_tasks(
                 rusqlite::params![
                     parent_id,
                     tab_id,
-                    task.title,
+                    title,
                     now,
                     task.completed_at,
                     task.deleted_at,
@@ -1513,7 +1517,7 @@ pub fn import_tasks(
                     task.id,
                     parent_id,
                     tab_id,
-                    task.title,
+                    title,
                     task.created_at,
                     now,
                     task.completed_at,

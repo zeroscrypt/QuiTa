@@ -4,6 +4,7 @@
   import { getLanguage, t } from '$i18n';
   import { settingsStore } from '$stores/settingsStore.svelte';
   import { updateStore } from '$stores/updateStore.svelte';
+  import { openUrl } from '@tauri-apps/plugin-opener';
 
   let { onClose }: { onClose: () => void } = $props();
 
@@ -20,6 +21,22 @@
 
   function onBackdropClick(event: MouseEvent) {
     if (event.target === event.currentTarget) onClose();
+  }
+
+  /**
+   * Hands the repository URL to the system browser.
+   *
+   * A plain `<a href>` would navigate the app's own webview to github.com,
+   * replacing the window with a web page. The opener plugin is scoped to this
+   * one repository, so a link to anywhere else is refused by the permission
+   * layer rather than by a check in this file.
+   */
+  async function openRepository(url: string) {
+    try {
+      await openUrl(url);
+    } catch {
+      // The URL is shown on the same line, so a failure is not a dead end.
+    }
   }
 </script>
 
@@ -52,7 +69,15 @@
       {#if info?.repository}
         <div class="about-row">
           <dt>GitHub</dt>
-          <dd class="about-link">{info.repository}</dd>
+          <dd>
+            <button
+              class="about-link"
+              onclick={() => void openRepository(info!.repository)}
+              title={info.repository}
+            >
+              {info.repository}
+            </button>
+          </dd>
         </div>
       {/if}
     </dl>
@@ -112,7 +137,21 @@
   }
 
   .about-link {
+    /* A button, because a bare <a href> would replace the app window with
+       github.com inside the app's own webview. */
+    padding: 0;
+    border: none;
+    background: none;
     color: var(--accent);
+    font: inherit;
+    font-weight: 550;
+    text-align: right;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+  }
+
+  .about-link:hover {
+    text-decoration: underline;
   }
 
   .about-update {

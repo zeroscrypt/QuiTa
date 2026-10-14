@@ -52,6 +52,12 @@ pub enum TaskError {
     #[error("cannot parse the file: {0}")]
     ImportParse(String),
 
+    #[error("the file is too large to import: the limit is {0} bytes")]
+    ImportTooLarge(u64),
+
+    #[error("title is too long: the limit is {0} characters")]
+    TitleTooLong(String),
+
     #[error("invalid move direction: {0}")]
     InvalidDirection(String),
 

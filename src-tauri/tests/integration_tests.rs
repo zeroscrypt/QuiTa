@@ -1803,3 +1803,72 @@ fn importing_tabs_twice_updates_instead_of_duplicating() {
         "Переименованная"
     );
 }
+
+#[test]
+fn import_refuses_a_hostile_title_instead_of_storing_it() {
+    // A file from anywhere is untrusted input. The UI caps a typed title at 500
+    // characters; an imported one must obey the same rule or one row could
+    // hold megabytes and wreck the layout.
+    let mut conn = open_test_db();
+    let huge = "x".repeat(50_000);
+    let payload = transfer::ExportPayload {
+        version: 2,
+        exported_at: "2026-10-14T00:00:00Z".to_string(),
+        tasks: vec![
+            task_json("huge", &huge),
+            task_json("ok", "Нормальная задача"),
+        ],
+        tabs: None,
+        settings: None,
+    };
+
+    let (added, _, skipped) = repository::import_tasks(&mut conn, &payload.tasks).unwrap();
+    assert_eq!(
+        (added, skipped),
+        (1, 1),
+        "the oversized title must be skipped"
+    );
+
+    let stored = repository::list_roots(&conn, true, None).unwrap();
+    assert_eq!(stored.len(), 1);
+    assert_eq!(stored[0].title, "Нормальная задача");
+    assert!(
+        stored[0].title.len() < 1_000,
+        "nothing oversized reached the database"
+    );
+}
+
+#[test]
+fn import_trims_and_normalises_a_title_like_typing_does() {
+    let mut conn = open_test_db();
+    let payload = transfer::ExportPayload {
+        version: 2,
+        exported_at: "2026-10-14T00:00:00Z".to_string(),
+        tasks: vec![task_json("padded", "   Задача с обрезкой   ")],
+        tabs: None,
+        settings: None,
+    };
+    repository::import_tasks(&mut conn, &payload.tasks).unwrap();
+    assert_eq!(
+        repository::list_roots(&conn, true, None).unwrap()[0].title,
+        "Задача с обрезкой"
+    );
+}
+
+fn task_json(id: &str, title: &str) -> Task {
+    Task {
+        id: id.to_string(),
+        parent_id: None,
+        tab_id: None,
+        title: title.to_string(),
+        created_at: "2026-10-14T00:00:00Z".to_string(),
+        updated_at: "2026-10-14T00:00:00Z".to_string(),
+        completed_at: None,
+        deleted_at: None,
+        due_date: None,
+        comment: None,
+        sort_order: 0,
+        completion_event_id: None,
+        auto_completed_by: None,
+    }
+}

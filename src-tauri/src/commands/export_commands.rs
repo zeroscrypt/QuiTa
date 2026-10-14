@@ -13,6 +13,12 @@ use crate::error::TaskError;
 /// instead of just the visible task list.
 const EXPORT_FORMAT_VERSION: u32 = 2;
 
+/// Upper bound for an import file. The largest realistic export — a hundred
+/// thousand tasks — is around 25 MB, so 64 MB is generous. Without the check a
+/// user who picks a multi-gigabyte file by mistake has the whole thing pulled
+/// into memory at once.
+const MAX_IMPORT_BYTES: u64 = 64 * 1024 * 1024;
+
 /// Result of an import, shown to the user so the result is never silent.
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,6 +104,12 @@ pub async fn import_tasks(
         .into_path()
         .map_err(|e| TaskError::ImportRead(e.to_string()))?;
 
+    let size = std::fs::metadata(&path)
+        .map(|m| m.len())
+        .map_err(|e| TaskError::ImportRead(e.to_string()))?;
+    if size > MAX_IMPORT_BYTES {
+        return Err(TaskError::ImportTooLarge(MAX_IMPORT_BYTES));
+    }
     let contents =
         std::fs::read_to_string(&path).map_err(|e| TaskError::ImportRead(e.to_string()))?;
     let payload = transfer::parse(&contents)?;
