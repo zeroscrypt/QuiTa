@@ -1,0 +1,145 @@
+name: Build
+
+# Attaches the installers to a release that Release Please has already created.
+#
+# Started through workflow_dispatch by release.yml: the tag is created with the
+# repository's own GITHUB_TOKEN, and a push made with that token does not start
+# a workflow run. workflow_dispatch is the exception that makes the handover
+# possible.
+#
+# Can also be started by hand to rebuild a release:
+#   gh workflow run build.yml --ref main -f tag=v1.0.4
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build, e.g. v1.0.4"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS (Apple Silicon)
+            os: macos-14
+            target: aarch64-apple-darwin
+          - name: macOS (Intel)
+            os: macos-14
+            target: x86_64-apple-darwin
+          - name: Windows
+            os: windows-latest
+            target: ""
+          - name: Linux
+            os: ubuntu-22.04
+            target: ""
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The updater compares the version in the binary with the one in the
+      # release manifest. If they ever disagree the green banner silently
+      # stops appearing, so the checkout is checked against the tag first.
+      - name: Verify the tag matches the sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${TAG#v}"
+          found="$(node -p "require('./package.json').version")"
+          if [ "$found" != "$expected" ]; then
+            echo "::error::The checkout says $found but the tag says $expected."
+            exit 1
+          fi
+          node scripts/bump-version.mjs --check "$TAG"
+        env:
+          TAG: ${{ inputs.tag }}
+
+      # Updater artifacts are enabled through a separate config file rather
+      # than tauri.conf.json: the flag makes a local `pnpm tauri build` fail on
+      # a machine that has no signing key, and contributors must be able to
+      # build without any secret. This produces latest.json and the .sig files
+      # that the in-app update banner reads. A release built without the
+      # signing secret is still installable; it just has no latest.json, so the
+      # app will not offer an update. Check for that file in the release.
+      - name: Build and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ inputs.tag }}
+          releaseName: QuiTa ${{ inputs.tag }}
+          releaseBody: See docs/DISTRIBUTION.md for install instructions.
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }} --config src-tauri/tauri.updater.conf.json
+
+  checksums:
+    name: Checksums
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      # `gh release download` resolves the repository through git, so this job
+      # fails without a checkout even though it touches no source file.
+      - uses: actions/checkout@v4
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          mkdir -p dist
+          gh release download "$TAG" --dir dist --pattern "QuiTa_*"
+
+      - name: Generate SHA256SUMS
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS
+
+      # The installer scripts refuse to trust a binary whose hash is missing
+      # from this file, so it must cover every artifact.
+      - name: Upload checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "$TAG" dist/SHA256SUMS --clobber
