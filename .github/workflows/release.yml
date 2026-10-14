@@ -103,13 +103,17 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          pattern: "*"
-          merge-multiple: true
+      # tauri-action uploads the installers straight to the GitHub Release, not
+      # as workflow artifacts — so they have to be downloaded back from there.
+      # `actions/download-artifact` finds nothing and silently skips creating
+      # the directory.
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          mkdir -p dist
+          gh release download "$TAG" --dir dist --pattern "QuiTa_*"
 
       - name: Generate SHA256SUMS
         working-directory: dist
