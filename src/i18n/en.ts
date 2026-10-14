@@ -169,6 +169,9 @@ export const en: Record<string, string> = {
   'settings.deletedChildrenMany': '{count} subtasks',
   'settings.deletedSubtask': 'subtask · ',
   'settings.trashNote': 'Restoring a parent brings its subtasks back too. A subtask restored on its own becomes a root task.',
+  'settings.purgeAllConfirm': 'The bin holds {count}. Delete everything permanently?',
+  'settings.purgeAllFailed': 'The bin was not cleared: {count} could not be removed',
+  'settings.purging': 'Clearing…',
   'settings.purgeAllDone': 'Trash cleared — {count} removed',
   'settings.exportFailed': 'Export failed: {reason}',
   'settings.dataHint':

@@ -21,6 +21,14 @@ English · **[Русский](README.ru.md)**
 
 ---
 
+> **Quick Tasks App — QuiTa**
+>
+> | | | | | | | |
+> |---|---|---|---|---|---|---|
+> | [🔵 What this is](#-what-this-is) | [🟢 Install](#-install) | [🟡 Features](#-features) | [🟠 How it works](#-how-it-works) | [🔴 Data](#-data) | [⚪ Development](#-development) | [⚫ Project](#-project) |
+
+---
+
 ## 🔵 What this is
 
 Every task manager offers **planning**. QuiTa offers **capture**.
