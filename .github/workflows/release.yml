@@ -56,6 +56,19 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      # ВРЕМЕННО: спрашиваем у GitHub, что он думает о правах этого токена.
+      # Пустой tag_name даёт 422 у того, у кого права есть, и 403 у того,
+      # у кого их нет. Тело ответа покажет, в чём дело.
+      - name: Probe token rights
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api -X POST "repos/$REPO/releases" -f tag_name= -f name= 2>&1 \
+            | sed 's/^/  ответ: /' || true
+          echo "--- права ---"
+          gh api "repos/$REPO" --jq '.permissions' 2>&1 | sed 's/^/  /' || true
+
       - id: release
         uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
         with:
