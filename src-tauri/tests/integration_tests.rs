@@ -765,7 +765,7 @@ fn an_import_cannot_make_a_task_its_own_parent() {
 fn the_database_refuses_a_task_that_is_its_own_parent() {
     // The same rule has to hold for any other path into the table, not
     // only for import.
-    let mut conn = open_test_db();
+    let conn = open_test_db();
     let tab = repository::ensure_default_tab(&conn).unwrap();
     let id = "self-parent";
     conn.execute(
