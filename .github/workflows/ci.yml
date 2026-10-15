@@ -4,12 +4,76 @@ on:
   push:
     branches: [main]
   pull_request:
+    # Release Please opens its pull request with the repository token, and
+    # GitHub holds `pull_request` workflows on such a branch until a person
+    # approves them. Nobody ever does, so the branch collected eleven runs that
+    # waited forever and checked nothing. The version bump is already covered by
+    # the CI of the main commit it is built from.
+    branches-ignore:
+      - 'release-please--**'
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Decides what is actually worth building.
+  #
+  # A typo in the README does not change a single byte of the application, yet
+  # the Tauri build produces installers for three platforms and takes about
+  # fifteen minutes. Two out of every five commits to main were documentation or
+  # pipeline work, so this was the single largest source of wasted runner time.
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      rust: ${{ steps.filter.outputs.rust }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The comparison needs the previous commit, which a shallow clone does
+          # not have.
+          fetch-depth: 0
+
+      - id: filter
+        run: |
+          set -euo pipefail
+          before="${{ github.event.before }}"
+          head="${{ github.sha }}"
+
+          # On the first push to a new branch there is nothing to compare
+          # against, and the whole tree is treated as changed.
+          if ! git cat-file -e "$before^{commit}" 2>/dev/null; then
+            echo "app=yes" >> "$GITHUB_OUTPUT"
+            echo "rust=yes" >> "$GITHUB_OUTPUT"
+            echo "No base commit to compare against; building everything."
+            exit 0
+          fi
+
+          changed="$(git diff --name-only "$before" "$head")"
+
+          if printf '%s\n' "$changed" \
+            | grep -qE '^(src/|src-tauri/|tests/|scripts/|package\.json|pnpm-lock\.yaml)'; then
+            echo "app=yes" >> "$GITHUB_OUTPUT"
+            echo "rust=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "app=no" >> "$GITHUB_OUTPUT"
+            # Prose still reaches the Rust tests: the documentation guard reads
+            # both READMEs and the screenshots they link to, so a commit that
+            # only edits them still has to run that suite. Skipping it on the
+            # strength of "no code changed" would quietly stop checking exactly
+            # the thing that changed.
+            if printf '%s\n' "$changed" \
+              | grep -qE '(\.md$|^docs/|^\.github/|^CONTRIBUTING\.md|^SECURITY\.md)'; then
+              echo "rust=yes" >> "$GITHUB_OUTPUT"
+            else
+              echo "rust=no" >> "$GITHUB_OUTPUT"
+            fi
+            echo "Only files outside the build were touched:"
+            printf '%s\n' "$changed" | sed 's/^/  /'
+          fi
+
   frontend:
     name: Frontend (lint, typecheck, tests, build)
     runs-on: ubuntu-latest
@@ -44,6 +108,8 @@ jobs:
         run: pnpm audit --audit-level moderate
 
   rust:
+    needs: changes
+    if: needs.changes.outputs.rust == 'yes'
     name: Rust (fmt, clippy, tests)
     runs-on: ubuntu-latest
     steps:
@@ -89,6 +155,8 @@ jobs:
           ignore: RUSTSEC-2024-0370, RUSTSEC-2024-0429
 
   tauri-build-macos:
+    needs: changes
+    if: needs.changes.outputs.app == 'yes'
     name: Tauri build (macOS Apple Silicon)
     runs-on: macos-14
     steps:
@@ -117,6 +185,8 @@ jobs:
         run: pnpm tauri build
 
   tauri-build-windows:
+    needs: changes
+    if: needs.changes.outputs.app == 'yes'
     name: Tauri build (Windows)
     runs-on: windows-latest
     steps:
@@ -159,6 +229,8 @@ jobs:
         run: pnpm tauri build
 
   tauri-build-linux:
+    needs: changes
+    if: needs.changes.outputs.app == 'yes'
     name: Tauri build (Linux)
     runs-on: ubuntu-latest
     steps:
