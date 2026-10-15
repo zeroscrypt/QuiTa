@@ -228,6 +228,74 @@ jobs:
       - name: Build app
         run: pnpm tauri build
 
+      # Producing an MSI proves only that the bundler ran. Whether it installs,
+      # whether the executable lands where Windows expects it, and whether the
+      # app survives its own startup are three separate questions, and on
+      # Windows all three have their own way of failing.
+      - name: Install and start the app
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $msi = Get-ChildItem "$env:GITHUB_WORKSPACE\src-tauri\target\release\bundle\msi\*.msi" |
+            Select-Object -First 1
+          if (-not $msi) { throw 'no MSI was produced' }
+          Write-Host "Installing $($msi.Name)"
+
+          $install = Start-Process msiexec -Wait -PassThru -ArgumentList @(
+            '/i', "`"$($msi.FullName)`"", '/quiet', '/norestart'
+          )
+          if ($install.ExitCode -ne 0) {
+            throw "msiexec failed with exit code $($install.ExitCode)"
+          }
+
+          # Not hardcoded: the install directory has moved between Tauri
+          # versions, and a path that silently stops existing would turn this
+          # into a test that never checks anything.
+          $candidates = @(
+            "$env:ProgramFiles\QuiTa\quita.exe",
+            "${env:ProgramFiles(x86)}\QuiTa\quita.exe",
+            "$env:LOCALAPPDATA\QuiTa\quita.exe",
+            "$env:LOCALAPPDATA\Programs\QuiTa\quita.exe"
+          ) | Where-Object { Test-Path $_ }
+          if (-not $candidates) {
+            throw 'installed, but the executable is in none of the usual places'
+          }
+          $exe = @($candidates)[0]
+          Write-Host "Installed to $exe"
+
+          $app = Start-Process $exe -PassThru
+          Start-Sleep -Seconds 10
+          if ($app.HasExited) {
+            throw "the app quit on its own with exit code $($app.ExitCode)"
+          }
+
+          # The database is written on the first launch, so finding it proves
+          # the app got past initialisation and opened its own storage rather
+          # than sitting there with a window and no state.
+          $db = Get-ChildItem "$env:APPDATA\com.quita.app\quita.db*" -ErrorAction SilentlyContinue
+          if (-not $db) {
+            throw "the app is running but wrote no database in $env:APPDATA\com.quita.app"
+          }
+          Write-Host "Running as pid $($app.Id), database: $(@($db)[0].Name)"
+
+      - name: Remove the app again
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'SilentlyContinue'
+          Get-Process -Name 'quita' | Stop-Process -Force
+          Start-Sleep -Seconds 2
+          # Uninstalling proves the reverse direction too: an installer that
+          # cannot be removed leaves the next run testing a patched machine.
+          $msi = Get-ChildItem "$env:GITHUB_WORKSPACE\src-tauri\target\release\bundle\msi\*.msi" |
+            Select-Object -First 1
+          if ($msi) {
+            $p = Start-Process msiexec -Wait -PassThru -ArgumentList @('/x', "`"$($msi.FullName)`"", '/quiet')
+            Write-Host "uninstall exit code $($p.ExitCode)"
+          }
+          Remove-Item -Recurse -Force "$env:APPDATA\com.quita.app" -ErrorAction SilentlyContinue
+
   tauri-build-linux:
     needs: changes
     if: needs.changes.outputs.app == 'yes'
