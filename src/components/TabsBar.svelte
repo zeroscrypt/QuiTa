@@ -2,6 +2,7 @@
   import { tick, untrack } from 'svelte';
   import ContextMenu from './ContextMenu.svelte';
   import { tabStore } from '$stores/tabStore.svelte';
+  import { uiStore } from '$stores/uiStore.svelte';
   import { appStore } from '$stores/appStore.svelte';
   import { dragStore } from '$stores/dragStore.svelte';
   import { settingsStore } from '$stores/settingsStore.svelte';
@@ -278,14 +279,20 @@
             label: canDelete ? t('tab.delete') : t('tab.deleteLast'),
             danger: canDelete,
             disabled: !canDelete,
-            onClick: () => {
-              if (menuTabId && canDelete) void tabStore.remove(menuTabId);
+            onClick: async () => {
+              if (!menuTabId || !canDelete) return;
+              const tab = tabs.find((x) => x.id === menuTabId);
+              if (!tab) return;
+              // The count is fetched rather than read from a badge that may be
+              // stale, so the warning cannot promise fewer tasks than go.
+              await tabStore.refreshStats();
+              uiStore.askDeleteTab(tab, tabStore.stats[tab.id]?.total ?? 0);
+              },
             },
-          },
-        ]
-      : [],
-  );
-</script>
+          ]
+        : [],
+    );
+  </script>
 
 <svelte:window
   onpointermove={onTabPointerMove}

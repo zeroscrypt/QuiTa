@@ -32,6 +32,20 @@ export interface Tab {
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Set while the tab sits in the trash. The row survives so its tasks keep a
+   * valid reference and can be brought back into the same tab.
+   */
+  deletedAt: string | null;
+}
+
+/**
+ * What deleting a tab did, and what the undo needs. Nothing else can work this
+ * out afterwards: once the tasks are in the trash they look like any others.
+ */
+export interface TabDeletion {
+  tab: Tab;
+  taskIds: TaskId[];
 }
 
 export interface TaskNode {
@@ -51,14 +65,14 @@ export interface SearchResult {
 
 export interface AppSettings {
   /** "system" | "light" | "dark" */
-  theme: 'system' | 'light' | 'dark';
+  theme: "system" | "light" | "dark";
   showCompleted: boolean;
   /** Completing a parent also completes its open subtasks (default: true). */
   cascadeComplete: boolean;
   /** Completed tasks are soft-deleted after this many days (null = never). */
   autoDeleteDays: number | null;
   /** Interface language. */
-  language: 'ru' | 'en';
+  language: "ru" | "en";
   /** Subtasks are shown without being expanded by hand (default: true). */
   expandSubtasks: boolean;
   /** Show a done/total counter on every tab (default: true). */
@@ -78,7 +92,7 @@ export class TaskServiceError extends Error {
     public readonly cause?: unknown,
   ) {
     super(message);
-    this.name = 'TaskServiceError';
+    this.name = "TaskServiceError";
   }
 }
 

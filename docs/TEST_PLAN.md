@@ -394,7 +394,12 @@ GitHub Actions (`.github/workflows/ci.yml`):
 | `error_messages_serialize_as_strings` | ошибки доходят до UI строкой, а не `[object Object]` |
 | `moving_a_subtask_to_another_tab_moves_its_parent` | дерево задач никогда не разрывается между вкладками |
 | `purge_refuses_a_task_that_is_not_deleted` | необратимое удаление доступно только для мягко удалённых задач |
-| `deleting_a_tab_never_targets_itself` | удаление вкладки не падает на внешнем ключе и не теряет задачи |
+| `deleting_a_tab_takes_its_tasks_to_the_trash_and_keeps_the_last_one` | задачи вкладки уходят в корзину, а соседняя остаётся пустой |
+| `undoing_a_tab_deletion_brings_the_tab_and_its_tasks_back` | откат возвращает вкладку и ровно те задачи, что унесла |
+| `a_deleted_tabs_tasks_keep_pointing_at_it` | удалённая вкладка не отдаёт задачи соседней |
+| `restoring_a_task_from_a_deleted_tab_brings_the_tab_back` | восстановление задачи возвращает и вкладку |
+| `emptying_the_trash_drops_tabs_nothing_points_at` | опустевшая вкладка удаляется из базы |
+| `the_last_visible_tab_survives_deleted_ones` | удалённые вкладки не мешают удалить последнюю |
 | `a_task_never_ends_up_without_a_tab` | задача без вкладки не пропадает из списков |
 | `empty_tab_name_is_rejected_instead_of_silently_defaulted` | единый контракт ошибок для имён вкладок |
 | `count_subtasks_includes_completed_and_hidden_children` | подтверждение удаления показывает настоящее число подзадач |

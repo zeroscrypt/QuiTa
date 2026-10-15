@@ -1,11 +1,13 @@
 <script lang="ts">
   import { uiStore } from '$stores/uiStore.svelte';
   import { taskStore } from '$stores/taskStore.svelte';
+  import { tabStore } from '$stores/tabStore.svelte';
   import { truncate } from '$domain/taskRules';
   import { t } from '$i18n';
   import { fill } from '$lib/text';
 
   const deleteState = $derived(uiStore.confirmDelete);
+  const tabState = $derived(uiStore.confirmTabDelete);
   let busy = $state(false);
   let confirmBtn = $state<HTMLButtonElement | undefined>(undefined);
 
@@ -18,26 +20,39 @@
   }
 
   $effect(() => {
-    if (deleteState) confirmBtn?.focus();
+    if (deleteState || tabState) confirmBtn?.focus();
   });
 
   async function confirm() {
-    if (!deleteState || busy) return;
+    if (busy) return;
+    const task = deleteState;
+    const tab = tabState;
+    if (!task && !tab) return;
     busy = true;
     try {
-      await taskStore.remove(deleteState.task.id);
+      if (tab) {
+        const deletion = await tabStore.remove(tab.tab.id);
+        // The notice holds everything needed to undo, so the dialog can close
+        // before the countdown starts.
+        if (deletion) uiStore.announceTabDeletion(deletion);
+      } else if (task) {
+        await taskStore.remove(task.task.id);
+      }
     } finally {
       busy = false;
       uiStore.cancelDelete();
+      uiStore.cancelTabDelete();
     }
   }
 
   function onBackdropClick(event: MouseEvent) {
-    if (event.target === event.currentTarget) uiStore.cancelDelete();
+    if (event.target !== event.currentTarget) return;
+    uiStore.cancelDelete();
+    uiStore.cancelTabDelete();
   }
 </script>
 
-{#if deleteState}
+{#if deleteState || tabState}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
   <div class="backdrop" onclick={onBackdropClick} role="presentation">
     <div
@@ -48,15 +63,27 @@
     aria-modal="true"
     aria-labelledby="confirm-title"
   >
-      <h2 id="confirm-title" class="dialog-title">{t('delete.title')}</h2>
+      <h2 id="confirm-title" class="dialog-title">
+        {tabState ? t('delete.tabTitle') : t('delete.title')}
+      </h2>
       <p class="dialog-message">
-        {fill(
-          fill(t('delete.message'), 'title', truncate(deleteState.task.title, 60)),
-          'cascade',
-          deleteState.cascadeCount > 0
-            ? fill(t('delete.cascade'), 'count', String(deleteState.cascadeCount))
-            : '',
-        )}
+        {#if tabState}
+          {fill(
+            fill(t('delete.tabMessage'), 'title', truncate(tabState.tab.name, 60)),
+            'tasks',
+            tabState.taskCount > 0
+              ? fill(t('delete.tabTasks'), 'count', String(tabState.taskCount))
+              : '',
+          )}
+        {:else if deleteState}
+          {fill(
+            fill(t('delete.message'), 'title', truncate(deleteState.task.title, 60)),
+            'cascade',
+            deleteState.cascadeCount > 0
+              ? fill(t('delete.cascade'), 'count', String(deleteState.cascadeCount))
+              : '',
+          )}
+        {/if}
       </p>
       <div class="dialog-actions">
         <button class="button secondary" onclick={() => uiStore.cancelDelete()}>{t('delete.cancel')}</button>

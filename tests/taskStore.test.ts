@@ -1,19 +1,23 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Tauri APIs are unavailable outside the app shell; stores are imported for real
 // so that regressions like runes in a non-`.svelte.ts` module are caught here.
 const invoke = vi.fn();
-vi.mock('@tauri-apps/api/core', () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
-vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn(async () => () => {}) }));
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (...args: unknown[]) => invoke(...args),
+}));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async () => () => {}),
+}));
 
 function makeTask(overrides: Record<string, unknown> = {}) {
   return {
-    id: 'id-1',
+    id: "id-1",
     parentId: null,
     tabId: null,
-    title: 'Task',
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
+    title: "Task",
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
     completedAt: null,
     deletedAt: null,
     dueDate: null,
@@ -25,171 +29,190 @@ function makeTask(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe('taskStore', () => {
+describe("taskStore", () => {
   beforeEach(async () => {
     invoke.mockReset();
-    const { taskStore } = await import('../src/stores/taskStore.svelte');
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
     taskStore.nodes = [];
     taskStore.error = null;
   });
 
-  it('adds a new root task to the top of the list', async () => {
-    invoke.mockResolvedValueOnce(makeTask({ id: 'new', title: 'Новая задача' }));
-    const { taskStore } = await import('../src/stores/taskStore.svelte');
-    const { tabStore } = await import('../src/stores/tabStore.svelte');
+  it("adds a new root task to the top of the list", async () => {
+    invoke.mockResolvedValueOnce(
+      makeTask({ id: "new", title: "Новая задача" }),
+    );
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
+    const { tabStore } = await import("../src/stores/tabStore.svelte");
     tabStore.tabs = [
-      { id: 'tab-1', name: 'Tab', color: '#4c6fff', sortOrder: 0, createdAt: '', updatedAt: '' },
+      {
+        id: "tab-1",
+        name: "Tab",
+        color: "#4c6fff",
+        sortOrder: 0,
+        createdAt: "",
+        updatedAt: "",
+        deletedAt: null,
+      },
     ];
-    tabStore.activeTabId = 'tab-1';
+    tabStore.activeTabId = "tab-1";
 
-    await taskStore.addRoot('Новая задача');
+    await taskStore.addRoot("Новая задача");
 
-    expect(invoke).toHaveBeenCalledWith('create_task', {
-      title: 'Новая задача',
+    expect(invoke).toHaveBeenCalledWith("create_task", {
+      title: "Новая задача",
       parentId: null,
-      tabId: 'tab-1',
+      tabId: "tab-1",
     });
-    expect(taskStore.nodes.map((n) => n.task.title)).toEqual(['Новая задача']);
+    expect(taskStore.nodes.map((n) => n.task.title)).toEqual(["Новая задача"]);
   });
 
-  it('adds a subtask to the matching parent', async () => {
-    invoke.mockResolvedValueOnce(makeTask({ id: 'parent' }));
-    const { taskStore } = await import('../src/stores/taskStore.svelte');
-    taskStore.nodes = [{ task: makeTask({ id: 'parent' }), children: [] }];
-    invoke.mockResolvedValueOnce(makeTask({ id: 'child', parentId: 'parent' }));
+  it("adds a subtask to the matching parent", async () => {
+    invoke.mockResolvedValueOnce(makeTask({ id: "parent" }));
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
+    taskStore.nodes = [{ task: makeTask({ id: "parent" }), children: [] }];
+    invoke.mockResolvedValueOnce(makeTask({ id: "child", parentId: "parent" }));
 
-    await taskStore.addSubtask('parent', 'Подзадача');
+    await taskStore.addSubtask("parent", "Подзадача");
 
-    expect(invoke).toHaveBeenCalledWith('create_task', {
-      title: 'Подзадача',
-      parentId: 'parent',
+    expect(invoke).toHaveBeenCalledWith("create_task", {
+      title: "Подзадача",
+      parentId: "parent",
       tabId: null,
     });
     expect(taskStore.nodes[0].children).toHaveLength(1);
   });
 
-  it('removes the node after soft delete', async () => {
-    invoke.mockResolvedValueOnce([makeTask({ id: 'a' })]);
-    const { taskStore } = await import('../src/stores/taskStore.svelte');
+  it("removes the node after soft delete", async () => {
+    invoke.mockResolvedValueOnce([makeTask({ id: "a" })]);
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
     taskStore.nodes = [
-      { task: makeTask({ id: 'a' }), children: [] },
-      { task: makeTask({ id: 'b' }), children: [] },
+      { task: makeTask({ id: "a" }), children: [] },
+      { task: makeTask({ id: "b" }), children: [] },
     ];
 
-    await taskStore.remove('a');
+    await taskStore.remove("a");
 
-    expect(taskStore.nodes.map((n) => n.task.id)).toEqual(['b']);
+    expect(taskStore.nodes.map((n) => n.task.id)).toEqual(["b"]);
   });
 
-  it('toggle applies the outcome in place instead of reloading the list', async () => {
-    const { taskStore } = await import('../src/stores/taskStore.svelte');
-    const { settingsStore } = await import('../src/stores/settingsStore.svelte');
+  it("toggle applies the outcome in place instead of reloading the list", async () => {
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
+    const { settingsStore } =
+      await import("../src/stores/settingsStore.svelte");
     taskStore.nodes = [
-      { task: makeTask({ id: 'a' }), children: [] },
-      { task: makeTask({ id: 'b' }), children: [] },
+      { task: makeTask({ id: "a" }), children: [] },
+      { task: makeTask({ id: "b" }), children: [] },
     ];
     invoke.mockResolvedValueOnce({
-      updated: [makeTask({ id: 'b', completedAt: '2026-01-02T00:00:00Z' })],
+      updated: [makeTask({ id: "b", completedAt: "2026-01-02T00:00:00Z" })],
     });
 
-    await taskStore.toggle('b');
+    await taskStore.toggle("b");
 
-    expect(invoke).toHaveBeenNthCalledWith(1, 'toggle_task_completion', {
-      id: 'b',
+    expect(invoke).toHaveBeenNthCalledWith(1, "toggle_task_completion", {
+      id: "b",
       cascadeComplete: settingsStore.cascadeComplete,
     });
     // No full reload: the DOM (and the scroll position) stays untouched. The
     // only other call is the tab counter refresh, which is not a list reload.
     const commands = invoke.mock.calls.map((call) => call[0]);
-    expect(commands.filter((name) => name === 'list_tasks')).toHaveLength(0);
-    expect(commands).toContain('tab_stats');
-    expect(taskStore.nodes.map((n) => n.task.id)).toEqual(['a']);
+    expect(commands.filter((name) => name === "list_tasks")).toHaveLength(0);
+    expect(commands).toContain("tab_stats");
+    expect(taskStore.nodes.map((n) => n.task.id)).toEqual(["a"]);
   });
 
-  it('brings a reopened parent back into the list with its subtasks', async () => {
-    const { taskStore } = await import('../src/stores/taskStore.svelte');
+  it("brings a reopened parent back into the list with its subtasks", async () => {
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
     taskStore.nodes = [
-      { task: makeTask({ id: 'child', parentId: 'parent' }), children: [] },
+      { task: makeTask({ id: "child", parentId: "parent" }), children: [] },
     ];
     invoke.mockResolvedValueOnce({
       updated: [
-        makeTask({ id: 'parent' }),
-        makeTask({ id: 'child', parentId: 'parent' }),
+        makeTask({ id: "parent" }),
+        makeTask({ id: "child", parentId: "parent" }),
       ],
     });
-    invoke.mockResolvedValueOnce([makeTask({ id: 'sub', parentId: 'parent' })]);
+    invoke.mockResolvedValueOnce([makeTask({ id: "sub", parentId: "parent" })]);
 
-    await taskStore.toggle('child');
+    await taskStore.toggle("child");
 
-    expect(invoke).toHaveBeenNthCalledWith(2, 'list_subtasks', { parentId: 'parent' });
-    const parent = taskStore.nodes.find((n) => n.task.id === 'parent');
-    expect(parent?.children.map((c) => c.id)).toEqual(['sub']);
+    expect(invoke).toHaveBeenNthCalledWith(2, "list_subtasks", {
+      parentId: "parent",
+    });
+    const parent = taskStore.nodes.find((n) => n.task.id === "parent");
+    expect(parent?.children.map((c) => c.id)).toEqual(["sub"]);
   });
 
-  it('reparent moves a task under another parent', async () => {
-  const { taskStore } = await import('../src/stores/taskStore.svelte');
-  invoke.mockResolvedValueOnce(makeTask({ id: 'a', parentId: 'p' })); // reparent_task
-  invoke.mockResolvedValueOnce([]); // list_tasks
+  it("reparent moves a task under another parent", async () => {
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
+    invoke.mockResolvedValueOnce(makeTask({ id: "a", parentId: "p" })); // reparent_task
+    invoke.mockResolvedValueOnce([]); // list_tasks
 
-  await taskStore.reparent('a', 'p');
+    await taskStore.reparent("a", "p");
 
-  expect(invoke).toHaveBeenNthCalledWith(1, 'reparent_task', {
-    id: 'a',
-    parentId: 'p',
-    placeAtTop: true,
+    expect(invoke).toHaveBeenNthCalledWith(1, "reparent_task", {
+      id: "a",
+      parentId: "p",
+      placeAtTop: true,
+    });
   });
-});
 
-it('moveToTab sends the task to another tab', async () => {
-  const { taskStore } = await import('../src/stores/taskStore.svelte');
-  invoke.mockResolvedValueOnce(makeTask({ id: 'a', tabId: 'tab-2' }));
-  invoke.mockResolvedValueOnce([]);
+  it("moveToTab sends the task to another tab", async () => {
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
+    invoke.mockResolvedValueOnce(makeTask({ id: "a", tabId: "tab-2" }));
+    invoke.mockResolvedValueOnce([]);
 
-  await taskStore.moveToTab('a', 'tab-2');
+    await taskStore.moveToTab("a", "tab-2");
 
-  expect(invoke).toHaveBeenNthCalledWith(1, 'move_task_to_tab', {
-    id: 'a',
-    tabId: 'tab-2',
+    expect(invoke).toHaveBeenNthCalledWith(1, "move_task_to_tab", {
+      id: "a",
+      tabId: "tab-2",
+    });
   });
-});
 
-it('purges expired completed tasks when the retention setting is on', async () => {
-    const { taskStore } = await import('../src/stores/taskStore.svelte');
-    const { settingsStore } = await import('../src/stores/settingsStore.svelte');
+  it("purges expired completed tasks when the retention setting is on", async () => {
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
+    const { settingsStore } =
+      await import("../src/stores/settingsStore.svelte");
     settingsStore.autoDeleteDays = 30;
     invoke.mockReset();
-    invoke.mockResolvedValueOnce([makeTask({ id: 'gone' })]); // purge_completed_tasks
+    invoke.mockResolvedValueOnce([makeTask({ id: "gone" })]); // purge_completed_tasks
     invoke.mockResolvedValueOnce([]); // list_tasks
 
     await taskStore.init();
 
-    expect(invoke).toHaveBeenNthCalledWith(1, 'purge_completed_tasks');
+    expect(invoke).toHaveBeenNthCalledWith(1, "purge_completed_tasks");
     settingsStore.autoDeleteDays = null;
   });
 
-  it('passes the cascade setting from the store', async () => {
-    const { taskStore } = await import('../src/stores/taskStore.svelte');
-    const { settingsStore } = await import('../src/stores/settingsStore.svelte');
+  it("passes the cascade setting from the store", async () => {
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
+    const { settingsStore } =
+      await import("../src/stores/settingsStore.svelte");
     settingsStore.cascadeComplete = false;
     invoke.mockResolvedValueOnce({ updated: [] });
     invoke.mockResolvedValueOnce([]);
 
-    await taskStore.toggle('a');
+    await taskStore.toggle("a");
 
-    expect(invoke).toHaveBeenNthCalledWith(1, 'toggle_task_completion', {
-      id: 'a',
+    expect(invoke).toHaveBeenNthCalledWith(1, "toggle_task_completion", {
+      id: "a",
       cascadeComplete: false,
     });
     settingsStore.cascadeComplete = true;
   });
 
-  it('keeps completed tasks visible when the setting is on', async () => {
-    const { taskStore } = await import('../src/stores/taskStore.svelte');
-    const { settingsStore } = await import('../src/stores/settingsStore.svelte');
+  it("keeps completed tasks visible when the setting is on", async () => {
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
+    const { settingsStore } =
+      await import("../src/stores/settingsStore.svelte");
     settingsStore.showCompleted = true;
 
     invoke.mockResolvedValueOnce([
-      { task: makeTask({ id: 'a', completedAt: '2026-01-02T00:00:00Z' }), children: [] },
+      {
+        task: makeTask({ id: "a", completedAt: "2026-01-02T00:00:00Z" }),
+        children: [],
+      },
     ]);
     await taskStore.reload();
 

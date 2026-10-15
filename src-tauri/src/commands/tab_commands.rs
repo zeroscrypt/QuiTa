@@ -34,15 +34,28 @@ pub async fn reorder_tabs(
     repository::list_tabs(&conn)
 }
 
-/// Deletes a tab; its tasks move to `fallback_tab_id` so nothing is lost.
+/// Deletes a tab together with its tasks, both through the trash.
+///
+/// The result carries everything the undo needs, so the UI does not have to
+/// guess which tasks went with the tab.
 #[tauri::command]
 pub async fn delete_tab(
     id: TaskId,
-    fallback_tab_id: Option<TaskId>,
     db: State<'_, Db>,
-) -> Result<Vec<crate::domain::task::Task>, TaskError> {
+) -> Result<crate::domain::task::TabDeletion, TaskError> {
     let mut conn = db.lock().map_err(TaskError::Internal)?;
-    repository::delete_tab(&mut conn, &id, fallback_tab_id.as_deref())
+    repository::delete_tab(&mut conn, &id)
+}
+
+/// Takes back a tab deletion within the undo window.
+#[tauri::command]
+pub async fn restore_deleted_tab(
+    id: TaskId,
+    task_ids: Vec<TaskId>,
+    db: State<'_, Db>,
+) -> Result<crate::domain::task::TabDeletion, TaskError> {
+    let mut conn = db.lock().map_err(TaskError::Internal)?;
+    repository::restore_deleted_tab(&mut conn, &id, &task_ids)
 }
 
 /// Per-tab task counters for the tab bar badges.

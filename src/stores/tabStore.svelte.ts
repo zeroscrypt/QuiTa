@@ -1,11 +1,11 @@
-import type { Tab, TaskId } from '$lib/types';
-import * as tabService from '$services/tabService';
+import type { Tab, TabDeletion, TaskId } from "$lib/types";
+import * as tabService from "$services/tabService";
 
 class TabStore {
   tabs = $state<Tab[]>([]);
   activeTabId = $state<TaskId | null>(null);
   /** Tab being renamed (double click) or created. */
-  editingTabId = $state<TaskId | 'new' | null>(null);
+  editingTabId = $state<TaskId | "new" | null>(null);
   /** done/total per tab, refreshed after every list load. */
   stats = $state<Record<TaskId, { done: number; total: number }>>({});
 
@@ -16,7 +16,7 @@ class TabStore {
       this.tabs = [];
     }
     if (this.tabs.length > 0) {
-      const stored = localStorage.getItem('quita.activeTab');
+      const stored = localStorage.getItem("quita.activeTab");
       this.activeTabId = this.tabs.some((t) => t.id === stored)
         ? stored
         : this.tabs[0].id;
@@ -34,8 +34,11 @@ class TabStore {
     } catch {
       return;
     }
-    this.activeTabId = this.tabs.some((t) => t.id === previous) ? previous : null;
-    if (this.activeTabId === null && this.tabs.length > 0) this.activeTabId = this.tabs[0].id;
+    this.activeTabId = this.tabs.some((t) => t.id === previous)
+      ? previous
+      : null;
+    if (this.activeTabId === null && this.tabs.length > 0)
+      this.activeTabId = this.tabs[0].id;
   }
 
   /** Counter for a tab, or null when it has not been loaded yet. */
@@ -56,7 +59,8 @@ class TabStore {
       const list = await tabService.tabStats();
       if (request !== this.statsRequest) return;
       const next: Record<TaskId, { done: number; total: number }> = {};
-      for (const stat of list) next[stat.tabId] = { done: stat.done, total: stat.total };
+      for (const stat of list)
+        next[stat.tabId] = { done: stat.done, total: stat.total };
       this.stats = next;
     } catch {
       // Keep the previous counters.
@@ -70,7 +74,7 @@ class TabStore {
   select(tabId: TaskId): void {
     if (this.tabs.some((t) => t.id === tabId)) {
       this.activeTabId = tabId;
-      localStorage.setItem('quita.activeTab', tabId);
+      localStorage.setItem("quita.activeTab", tabId);
     }
   }
 
@@ -98,19 +102,36 @@ class TabStore {
       const position = new Map(orderedIds.map((id, index) => [id, index]));
       this.tabs = [...this.tabs].sort(
         (a, b) =>
-          (position.get(a.id) ?? a.sortOrder) - (position.get(b.id) ?? b.sortOrder),
+          (position.get(a.id) ?? a.sortOrder) -
+          (position.get(b.id) ?? b.sortOrder),
       );
     }
   }
 
-  async remove(tabId: TaskId): Promise<void> {
-    if (this.tabs.length <= 1) return; // the last tab is never removed
-    const fallback = this.tabs.find((t) => t.id !== tabId) ?? null;
-    await tabService.deleteTab(tabId, fallback?.id ?? null);
+  /**
+   * Deletes the tab with its tasks and returns what the undo needs.
+   *
+   * The tasks go to the trash rather than to a neighbour: handing them over
+   * read as the tab's notes quietly leaking into the tab on the left.
+   */
+  async remove(tabId: TaskId): Promise<TabDeletion | null> {
+    if (this.tabs.length <= 1) return null; // the last tab is never removed
+    const deletion = await tabService.deleteTab(tabId);
     this.tabs = this.tabs.filter((t) => t.id !== tabId);
     if (this.activeTabId === tabId) {
       this.select(this.tabs[0].id);
     }
+    return deletion;
+  }
+
+  /** Puts a deleted tab and its tasks back during the undo window. */
+  async restore(deletion: TabDeletion): Promise<void> {
+    await tabService.restoreDeletedTab(deletion.tab.id, deletion.taskIds);
+    await this.reload();
+    if (!this.tabs.some((tab) => tab.id === deletion.tab.id)) {
+      this.tabs = [...this.tabs, deletion.tab];
+    }
+    this.select(deletion.tab.id);
   }
 }
 

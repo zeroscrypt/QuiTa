@@ -44,6 +44,15 @@ fn active_task(conn: &Connection, id: &str) -> Task {
     .unwrap()
 }
 
+/// Reads a task straight from the table, deleted or not. `active_task` filters
+/// the trash out by design, which is exactly what these assertions must look at.
+fn deleted_at_of(conn: &Connection, id: &str) -> Option<String> {
+    conn.query_row("SELECT deleted_at FROM tasks WHERE id = ?1", [id], |row| {
+        row.get(0)
+    })
+    .unwrap()
+}
+
 fn subtask_titles(conn: &Connection, parent_id: &str) -> Vec<String> {
     let mut stmt = conn
         .prepare("SELECT title FROM tasks WHERE parent_id = ?1 AND deleted_at IS NULL ORDER BY sort_order ASC")
@@ -771,33 +780,170 @@ fn tabs_split_tasks_and_get_distinct_colors() {
 }
 
 #[test]
-fn deleting_a_tab_moves_its_tasks_and_keeps_the_last_one() {
+fn deleting_a_tab_takes_its_tasks_to_the_trash_and_keeps_the_last_one() {
     let mut conn = open_test_db();
     let first = repository::ensure_default_tab(&conn).unwrap();
     let second = repository::create_tab(&conn, "Работа").unwrap();
     let task = repository::create_task(&mut conn, "Важная", None, Some(&second.id), true).unwrap();
 
-    let moved = repository::delete_tab(&mut conn, &second.id, Some(&first.id)).unwrap();
-    assert_eq!(moved.len(), 1);
+    let deleted = repository::delete_tab(&mut conn, &second.id).unwrap();
+    assert_eq!(
+        deleted.task_ids,
+        vec![task.id.clone()],
+        "the undo needs the list"
+    );
+
     let remaining = repository::list_tabs(&conn).unwrap();
     assert_eq!(remaining.len(), 1);
     assert_eq!(remaining[0].id, first.id);
 
-    // The task survives with a new tab.
-    let relocated = active_task(&conn, &task.id);
-    assert_eq!(relocated.tab_id.as_deref(), Some(first.id.as_str()));
-    assert_eq!(
+    // The task goes to the trash and does not appear under the tab on the left.
+    // It used to be moved there, which read as the notes quietly leaking across.
+    assert!(
+        deleted_at_of(&conn, &task.id).is_some(),
+        "the task did not reach the trash"
+    );
+    assert!(
         repository::list_task_nodes(&conn, false, Some(&first.id))
             .unwrap()
-            .len(),
-        1
+            .is_empty(),
+        "the neighbouring tab stayed empty"
+    );
+    assert_eq!(
+        repository::list_deleted_all(&conn, 50).unwrap().len(),
+        1,
+        "the task is recoverable from the trash"
     );
 
     // The last tab cannot be removed.
     assert!(matches!(
-        repository::delete_tab(&mut conn, &first.id, None),
+        repository::delete_tab(&mut conn, &first.id),
         Err(TaskError::LastTab)
     ));
+}
+
+#[test]
+fn undoing_a_tab_deletion_brings_the_tab_and_its_tasks_back() {
+    let mut conn = open_test_db();
+    let _first = repository::ensure_default_tab(&conn).unwrap();
+    let work = repository::create_tab(&conn, "Работа").unwrap();
+    let keep = repository::create_task(&mut conn, "Остаётся", None, Some(&work.id), true).unwrap();
+    let gone = repository::create_task(&mut conn, "Уходит", None, Some(&work.id), true).unwrap();
+    // A task that was already in the trash must stay there after the undo.
+    let earlier = repository::create_task(&mut conn, "Старая", None, Some(&work.id), true).unwrap();
+    repository::soft_delete_task(&mut conn, &earlier.id).unwrap();
+
+    let deleted = repository::delete_tab(&mut conn, &work.id).unwrap();
+    let restored = repository::restore_deleted_tab(&mut conn, &work.id, &deleted.task_ids).unwrap();
+
+    assert_eq!(restored.tab.id, work.id);
+    assert!(restored.tab.deleted_at.is_none());
+    assert!(
+        repository::list_tabs(&conn)
+            .unwrap()
+            .iter()
+            .any(|t| t.id == work.id),
+        "the tab is back in the strip"
+    );
+    assert!(deleted_at_of(&conn, &keep.id).is_none());
+    assert!(deleted_at_of(&conn, &gone.id).is_none());
+    assert_eq!(
+        repository::list_task_nodes(&conn, false, Some(&work.id))
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(
+        deleted_at_of(&conn, &earlier.id).is_some(),
+        "the undo must not dig out of the trash what it did not put there"
+    );
+}
+
+#[test]
+fn the_last_visible_tab_survives_deleted_ones() {
+    // A tab deleted earlier is still a row, but it must not make the final
+    // live tab undeletable.
+    let mut conn = open_test_db();
+    let first = repository::ensure_default_tab(&conn).unwrap();
+    let second = repository::create_tab(&conn, "Втор��я").unwrap();
+    repository::delete_tab(&mut conn, &second.id).unwrap();
+
+    assert!(matches!(
+        repository::delete_tab(&mut conn, &first.id),
+        Err(TaskError::LastTab)
+    ));
+    assert_eq!(repository::list_tabs(&conn).unwrap().len(), 1);
+}
+
+#[test]
+fn deleting_an_empty_tab_is_allowed_and_undoable() {
+    let mut conn = open_test_db();
+    let _first = repository::ensure_default_tab(&conn).unwrap();
+    let empty = repository::create_tab(&conn, "Пустая").unwrap();
+
+    let deleted = repository::delete_tab(&mut conn, &empty.id).unwrap();
+    assert!(deleted.task_ids.is_empty());
+
+    let restored =
+        repository::restore_deleted_tab(&mut conn, &empty.id, &deleted.task_ids).unwrap();
+    assert_eq!(restored.tab.name, "Пустая");
+    assert!(restored.tab.deleted_at.is_none());
+}
+
+#[test]
+fn restoring_a_task_from_a_deleted_tab_brings_the_tab_back() {
+    // The tab row is hidden but alive, so a task restored on its own would
+    // land in a tab that no list shows. Restoring has to bring the tab too.
+    let mut conn = open_test_db();
+    let _first = repository::ensure_default_tab(&conn).unwrap();
+    let work = repository::create_tab(&conn, "Работа").unwrap();
+    let task = repository::create_task(&mut conn, "Задача", None, Some(&work.id), true).unwrap();
+
+    repository::delete_tab(&mut conn, &work.id).unwrap();
+    assert_eq!(repository::list_tabs(&conn).unwrap().len(), 1);
+
+    repository::restore_task(&mut conn, &task.id).unwrap();
+    assert!(
+        repository::list_tabs(&conn)
+            .unwrap()
+            .iter()
+            .any(|t| t.id == work.id),
+        "the tab stayed hidden, so the restored task is invisible"
+    );
+    assert_eq!(
+        repository::list_task_nodes(&conn, false, Some(&work.id))
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn emptying_the_trash_drops_tabs_nothing_points_at() {
+    // A deleted tab keeps its row only for as long as something refers to it.
+    let mut conn = open_test_db();
+    let _first = repository::ensure_default_tab(&conn).unwrap();
+    let work = repository::create_tab(&conn, "Работа").unwrap();
+    repository::create_task(&mut conn, "Задача", None, Some(&work.id), true).unwrap();
+
+    repository::delete_tab(&mut conn, &work.id).unwrap();
+    let rows: i64 = conn
+        .query_row("SELECT COUNT(*) FROM tabs WHERE id = ?1", [&work.id], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert_eq!(
+        rows, 1,
+        "the row survives while the task waits in the trash"
+    );
+
+    repository::purge_all_deleted(&mut conn).unwrap();
+    let rows: i64 = conn
+        .query_row("SELECT COUNT(*) FROM tabs WHERE id = ?1", [&work.id], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert_eq!(rows, 0, "nothing refers to it any more");
 }
 
 #[test]
@@ -1044,22 +1190,24 @@ fn purge_refuses_a_task_that_is_not_deleted() {
 }
 
 #[test]
-fn deleting_a_tab_never_targets_itself() {
+fn a_deleted_tabs_tasks_keep_pointing_at_it() {
+    // The tab row survives a deletion so the foreign key holds and the undo
+    // can put the tasks back into the same tab. Reassigning them to another
+    // tab is exactly the leak this behaviour replaced.
     let mut conn = open_test_db();
     let tab_a = repository::ensure_default_tab(&conn).unwrap();
     let tab_b = repository::create_tab(&conn, "Вторая").unwrap();
     let task = repository::create_task(&mut conn, "Задача", None, Some(&tab_a.id), true).unwrap();
 
-    // The caller passes the tab being deleted as the fallback: the tasks must
-    // still land somewhere instead of failing on the foreign key.
-    repository::delete_tab(&mut conn, &tab_a.id, Some(&tab_a.id)).unwrap();
+    repository::delete_tab(&mut conn, &tab_a.id).unwrap();
 
-    let moved = conn
+    let owner = conn
         .query_row("SELECT tab_id FROM tasks WHERE id = ?1", [&task.id], |r| {
             r.get::<_, Option<String>>(0)
         })
         .unwrap();
-    assert_eq!(moved.as_deref(), Some(tab_b.id.as_str()));
+    assert_eq!(owner.as_deref(), Some(tab_a.id.as_str()));
+    assert_ne!(owner.as_deref(), Some(tab_b.id.as_str()));
 }
 
 #[test]

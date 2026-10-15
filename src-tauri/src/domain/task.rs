@@ -187,6 +187,21 @@ pub struct Tab {
     pub sort_order: i64,
     pub created_at: String,
     pub updated_at: String,
+    /// Set when the tab was deleted. The row survives so that its tasks keep a
+    /// valid tab reference while they sit in the trash.
+    pub deleted_at: Option<String>,
+}
+
+/// What a tab deletion did, and everything needed to take it back.
+///
+/// The UI holds this for the length of the undo window; nothing else can work
+/// out which tasks were involved, because afterwards they are indistinguishable
+/// from any other deleted task.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TabDeletion {
+    pub tab: Tab,
+    pub task_ids: Vec<TaskId>,
 }
 
 /// Palette used to colour tabs automatically.

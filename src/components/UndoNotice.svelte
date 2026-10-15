@@ -29,13 +29,15 @@
     </span>
 
     <span class="undo-text">
-      {t('undo.flattenTitle')}
+      {notice.kind === 'flatten' ? t('undo.flattenTitle') : t('undo.tabTitle')}
       <span class="undo-detail">
-        {t('undo.flattenDetail', { count: String(notice.flattenedCount) })}
+        {notice.kind === 'flatten'
+          ? t('undo.flattenDetail', { count: String(notice.flattenedCount) })
+          : t('undo.tabDetail', { count: String(notice.taskCount) })}
       </span>
     </span>
 
-    <button class="undo-button" onclick={() => void uiStore.undoLastFlatten()}>
+    <button class="undo-button" onclick={() => void uiStore.undo()}>
       {t('undo.action')}
     </button>
   </div>

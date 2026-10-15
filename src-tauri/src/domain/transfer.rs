@@ -94,6 +94,7 @@ mod tests {
                 sort_order: 0,
                 created_at: "2026-10-14T10:00:00Z".to_string(),
                 updated_at: "2026-10-14T10:00:00Z".to_string(),
+                deleted_at: None,
             }]),
             settings: Some(AppSettings::default()),
         }

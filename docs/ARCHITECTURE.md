@@ -191,7 +191,7 @@ src-tauri/src/
 **Миграции:**
 - `db/migrations.rs` — таблица `schema_migrations` с версиями
 - Миграции применяются последовательно при запуске
-- Текущая версия: 4 — `create_tasks_and_settings` (1), `add_tabs` (2), `add_task_comment` (3), `add_task_search_text` (4)
+- Текущая версия: 4 — `create_tasks_and_settings` (1), `add_tabs` (2), `add_task_comment` (3), `add_task_search_text` (4), `add_tab_deleted_at` (5)
 
 **Транзакции:**
 - Все операции записи выполняются в транзакциях

@@ -51,6 +51,7 @@ pub fn run() {
             commands::tab_commands::create_tab,
             commands::tab_commands::rename_tab,
             commands::tab_commands::delete_tab,
+            commands::tab_commands::restore_deleted_tab,
             commands::tab_commands::reorder_tabs,
             commands::app_commands::purge_task,
             commands::app_commands::purge_all_deleted,

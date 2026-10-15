@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::domain::rules::{compute_toggle_plan, TogglePlan};
 use crate::domain::task::{
     AppSettings, ChildPlacement, DbStats, MatchedSubtask, ReparentReceipt, SearchResult, Tab,
-    TabStat, Task, TaskNode, ToggleOutcome, TAB_COLORS,
+    TabDeletion, TabStat, Task, TaskNode, ToggleOutcome, TAB_COLORS,
 };
 use crate::domain::validation;
 use crate::error::TaskError;
@@ -340,6 +340,21 @@ pub fn restore_task(conn: &mut Connection, id: &str) -> Result<Vec<Task>, TaskEr
             }
         }
     }
+    // A tab deleted alongside its tasks keeps its row but is hidden from the
+    // strip. Restoring one of those tasks without its tab would put a task back
+    // where no list can show it, so the tab comes back with it.
+    let tab_of: Option<Option<String>> = tx
+        .query_row("SELECT tab_id FROM tasks WHERE id = ?1", [id], |row| {
+            row.get::<_, Option<String>>(0)
+        })
+        .optional()?;
+    if let Some(Some(tab_id)) = tab_of {
+        tx.execute(
+            "UPDATE tabs SET deleted_at = NULL, updated_at = ?1 WHERE id = ?2 AND deleted_at IS NOT NULL",
+            rusqlite::params![now, tab_id],
+        )?;
+    }
+
     tx.commit()?;
 
     // Return everything that is active again after the restore.
@@ -694,6 +709,7 @@ pub fn purge_task(conn: &mut Connection, id: &str) -> Result<Vec<Task>, TaskErro
     for task_id in ids {
         tx.execute("DELETE FROM tasks WHERE id = ?1", [&task_id])?;
     }
+    purge_emptied_tabs(&tx)?;
     tx.commit()?;
     Ok(doomed)
 }
@@ -724,6 +740,7 @@ pub fn purge_all_deleted(conn: &mut Connection) -> Result<usize, TaskError> {
     }
 
     removed += tx.execute("DELETE FROM tasks WHERE deleted_at IS NOT NULL", [])?;
+    purge_emptied_tabs(&tx)?;
     tx.commit()?;
     Ok(removed)
 }
@@ -774,6 +791,21 @@ fn is_descendant_of(
     Err(TaskError::Internal(
         "task hierarchy is corrupted".to_string(),
     ))
+}
+
+/// Drops deleted tabs that no task refers to any more.
+///
+/// A tab deletion keeps the row so its tasks keep a valid reference. Once the
+/// trash is emptied those references are gone, and the row would otherwise sit
+/// in the database forever.
+fn purge_emptied_tabs(conn: &Connection) -> Result<usize, TaskError> {
+    let removed = conn.execute(
+        "DELETE FROM tabs
+         WHERE deleted_at IS NOT NULL
+           AND id NOT IN (SELECT tab_id FROM tasks WHERE tab_id IS NOT NULL)",
+        [],
+    )?;
+    Ok(removed)
 }
 
 /// Places a task at the end of its sibling group.
@@ -1040,6 +1072,7 @@ fn row_to_tab(row: &Row) -> rusqlite::Result<Tab> {
         sort_order: row.get("sort_order")?,
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
+        deleted_at: row.get("deleted_at")?,
     })
 }
 
@@ -1071,7 +1104,10 @@ pub fn ensure_default_tab(conn: &Connection) -> Result<Tab, TaskError> {
 }
 
 pub fn list_tabs(conn: &Connection) -> Result<Vec<Tab>, TaskError> {
-    let mut stmt = conn.prepare("SELECT * FROM tabs ORDER BY sort_order ASC")?;
+    // A deleted tab keeps its row so its tasks stay validly referenced while
+    // they wait in the trash, which means it has to be filtered out here.
+    let mut stmt =
+        conn.prepare("SELECT * FROM tabs WHERE deleted_at IS NULL ORDER BY sort_order ASC")?;
     let tabs = stmt
         .query_map([], row_to_tab)?
         .collect::<Result<Vec<_>, _>>()?;
@@ -1111,6 +1147,7 @@ pub fn create_tab(conn: &Connection, name: &str) -> Result<Tab, TaskError> {
         sort_order: max_order.unwrap_or(-1) + 1,
         created_at: now.clone(),
         updated_at: now,
+        deleted_at: None,
     };
     conn.execute(
         "INSERT INTO tabs (id, name, color, sort_order, created_at, updated_at)
@@ -1152,54 +1189,111 @@ pub fn get_tab(conn: &Connection, id: &str) -> Result<Tab, TaskError> {
         .ok_or_else(|| TaskError::NotFound(id.to_string()))
 }
 
-/// Deletes a tab and moves its tasks to `fallback_tab_id` (usually the first
-/// remaining tab), so no task is ever lost. The last tab cannot be deleted.
-pub fn delete_tab(
-    conn: &mut Connection,
-    id: &str,
-    fallback_tab_id: Option<&str>,
-) -> Result<Vec<Task>, TaskError> {
+/// Deletes a tab together with its tasks, both through the trash.
+///
+/// The tasks are not handed to a neighbouring tab. That looked safe, but from
+/// the user's side it read as the tab's notes quietly leaking into the tab on
+/// the left; and "nothing is lost" was true only if the neighbour was found. A
+/// real deletion says what it removes and can be taken back.
+///
+/// The tab row is kept and marked deleted rather than erased: its tasks keep
+/// pointing at it while they wait in the trash, which is what lets the undo put
+/// them back into the same tab. Returns what the undo needs.
+pub fn delete_tab(conn: &mut Connection, id: &str) -> Result<TabDeletion, TaskError> {
     let tx = conn.transaction()?;
-    let tabs: Vec<Tab> = {
-        let mut stmt = tx.prepare("SELECT * FROM tabs ORDER BY sort_order ASC")?;
-        let rows = stmt
-            .query_map([], row_to_tab)?
-            .collect::<Result<Vec<_>, _>>()?;
-        rows
-    };
-    if !tabs.iter().any(|t| t.id == id) {
-        return Err(TaskError::NotFound(id.to_string()));
-    }
-    if tabs.len() <= 1 {
+
+    let tab: Tab = tx
+        .query_row(
+            "SELECT * FROM tabs WHERE id = ?1 AND deleted_at IS NULL",
+            [id],
+            row_to_tab,
+        )
+        .optional()?
+        .ok_or_else(|| TaskError::NotFound(id.to_string()))?;
+
+    // Only the tabs on screen count: the ones already deleted are not a reason
+    // to refuse deleting the last one still standing.
+    let remaining: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM tabs WHERE deleted_at IS NULL AND id <> ?1",
+        [id],
+        |row| row.get(0),
+    )?;
+    if remaining == 0 {
         return Err(TaskError::LastTab);
     }
 
-    // A fallback pointing at the tab being deleted would make the UPDATE a
-    // no-op and then fail on the foreign key, so it is filtered out.
-    let target = fallback_tab_id
-        .filter(|f| *f != id && tabs.iter().any(|t| t.id == *f))
-        .map(|f| f.to_string())
-        .or_else(|| tabs.iter().find(|t| t.id != id).map(|t| t.id.clone()))
-        .ok_or(TaskError::LastTab)?;
-
-    let moved: Vec<Task> = {
-        let mut stmt = tx.prepare(&format!(
-            "SELECT {TASK_COLUMNS} FROM tasks WHERE tab_id = ?1 AND deleted_at IS NULL"
-        ))?;
-        let rows = stmt
-            .query_map([id], row_to_task)?
-            .collect::<Result<Vec<_>, _>>()?;
-        rows
+    let task_ids: Vec<String> = {
+        let mut stmt = tx.prepare(
+            "SELECT id FROM tasks WHERE tab_id = ?1 AND deleted_at IS NULL ORDER BY sort_order ASC",
+        )?;
+        let rows = stmt.query_map([id], |row| row.get::<_, String>(0))?;
+        rows.collect::<Result<Vec<_>, _>>()?
     };
 
     let now = now_rfc3339();
+    if !task_ids.is_empty() {
+        tx.execute(
+            "UPDATE tasks SET deleted_at = ?1, updated_at = ?1 WHERE tab_id = ?2 AND deleted_at IS NULL",
+            rusqlite::params![now, id],
+        )?;
+    }
     tx.execute(
-        "UPDATE tasks SET tab_id = ?1, updated_at = ?2 WHERE tab_id = ?3",
-        rusqlite::params![target, now, id],
+        "UPDATE tabs SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2",
+        rusqlite::params![now, id],
     )?;
-    tx.execute("DELETE FROM tabs WHERE id = ?1", [id])?;
+
+    let deleted = TabDeletion {
+        tab: Tab {
+            deleted_at: Some(now.clone()),
+            updated_at: now,
+            ..tab
+        },
+        task_ids,
+    };
     tx.commit()?;
-    Ok(moved)
+    Ok(deleted)
+}
+
+/// Takes back a tab deletion: the tab reappears and exactly the tasks it took
+/// with it leave the trash.
+pub fn restore_deleted_tab(
+    conn: &mut Connection,
+    tab_id: &str,
+    task_ids: &[String],
+) -> Result<TabDeletion, TaskError> {
+    let tx = conn.transaction()?;
+    // Read before the update so a tab id that does not exist fails loudly
+    // instead of silently doing nothing.
+    tx.query_row("SELECT id FROM tabs WHERE id = ?1", [tab_id], |row| {
+        row.get::<_, String>(0)
+    })
+    .optional()?
+    .ok_or_else(|| TaskError::NotFound(tab_id.to_string()))?;
+
+    let now = now_rfc3339();
+    // One statement per task inside a single transaction, rather than an IN
+    // list: the list length comes from the undo window in the UI and building
+    // SQL out of it would mean interpolating a count into a query string.
+    let mut stmt = tx.prepare(
+        "UPDATE tasks SET deleted_at = NULL, updated_at = ?1
+         WHERE id = ?2 AND tab_id = ?3 AND deleted_at IS NOT NULL",
+    )?;
+    for id in task_ids {
+        stmt.execute(rusqlite::params![now, id, tab_id])?;
+    }
+    drop(stmt);
+
+    tx.execute(
+        "UPDATE tabs SET deleted_at = NULL, updated_at = ?1 WHERE id = ?2",
+        rusqlite::params![now, tab_id],
+    )?;
+
+    let tab = tx.query_row("SELECT * FROM tabs WHERE id = ?1", [tab_id], row_to_tab)?;
+    tx.commit()?;
+    Ok(TabDeletion {
+        tab,
+        task_ids: task_ids.to_vec(),
+    })
 }
 
 /// All non-deleted tasks (including completed) for JSON export.

@@ -95,6 +95,17 @@ ALTER TABLE tasks ADD COLUMN comment TEXT;
 "#,
     },
     Migration {
+        version: 5,
+        name: "add_tab_deleted_at",
+        sql: r#"
+-- A deleted tab keeps its row so the tasks in the trash still point at a tab
+-- that exists. Hard-deleting the row would break the foreign key, and setting
+-- the tasks' tab_id to NULL would lose which tab they came from, so undoing
+-- the deletion could not put them back.
+ALTER TABLE tabs ADD COLUMN deleted_at TEXT;
+"#,
+    },
+    Migration {
         version: 4,
         name: "add_task_search_text",
         sql: r#"
