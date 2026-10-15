@@ -39,6 +39,8 @@ jobs:
   build:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    # A stuck job must not hold a runner for the six hours GitHub allows.
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -137,6 +139,8 @@ jobs:
     name: Checksums
     needs: build
     runs-on: ubuntu-latest
+    # A stuck job must not hold a runner for the six hours GitHub allows.
+    timeout-minutes: 15
     steps:
       # `gh release download` resolves the repository through git, so this job
       # fails without a checkout even though it touches no source file.
@@ -205,6 +209,8 @@ jobs:
     name: Check every release has files
     needs: [build, checksums]
     runs-on: ubuntu-latest
+    # A stuck job must not hold a runner for the six hours GitHub allows.
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:

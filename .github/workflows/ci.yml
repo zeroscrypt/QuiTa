@@ -38,6 +38,8 @@ jobs:
   changes:
     name: What changed
     runs-on: ubuntu-latest
+    # A stuck job must not hold a runner for the six hours GitHub allows.
+    timeout-minutes: 10
     outputs:
       app: ${{ steps.filter.outputs.app }}
       rust: ${{ steps.filter.outputs.rust }}
@@ -104,6 +106,8 @@ jobs:
   frontend:
     name: Frontend (lint, typecheck, tests, build)
     runs-on: ubuntu-latest
+    # A stuck job must not hold a runner for the six hours GitHub allows.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -139,6 +143,8 @@ jobs:
     if: needs.changes.outputs.rust == 'yes'
     name: Rust (fmt, clippy, tests)
     runs-on: ubuntu-latest
+    # A stuck job must not hold a runner for the six hours GitHub allows.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -186,6 +192,8 @@ jobs:
     if: needs.changes.outputs.app == 'yes'
     name: Tauri build (macOS Apple Silicon)
     runs-on: macos-14
+    # A stuck job must not hold a runner for the six hours GitHub allows.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -216,6 +224,8 @@ jobs:
     if: needs.changes.outputs.app == 'yes'
     name: Tauri build (Windows)
     runs-on: windows-latest
+    # A stuck job must not hold a runner for the six hours GitHub allows.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -362,6 +372,8 @@ jobs:
     if: needs.changes.outputs.app == 'yes'
     name: Tauri build (Linux)
     runs-on: ubuntu-latest
+    # A stuck job must not hold a runner for the six hours GitHub allows.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
