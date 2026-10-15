@@ -272,7 +272,7 @@ frontend (Svelte 5 + TS)  ──invoke──▶  Tauri-команды  ──▶
 | `pnpm tauri build` | Установщики под текущую платформу |
 | `pnpm check` | Типы Svelte и TypeScript |
 | `pnpm test` | 119 модульных тестов |
-| `cargo test --manifest-path src-tauri/Cargo.toml` | 127 Rust-тестов (40 модульных + 84 интеграционных на настоящей базе + 3 на документацию) |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | 128 Rust-тестов (40 модульных + 84 интеграционных на настоящей базе + 4 на документацию) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Линты, ошибки как предупреждения |
 | `cargo audit` | Уязвимости в зависимостях |
 

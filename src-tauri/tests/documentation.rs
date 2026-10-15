@@ -102,3 +102,103 @@ fn screenshots_are_small_enough_to_load_in_a_readme() {
         );
     }
 }
+
+/// Counts the test attributes in one file, or in a whole directory.
+fn count_tests_in(relative: &str) -> usize {
+    fn walk(path: &Path) -> usize {
+        if path.is_dir() {
+            let mut total = 0;
+            if let Ok(entries) = std::fs::read_dir(path) {
+                for entry in entries.flatten() {
+                    total += walk(&entry.path());
+                }
+            }
+            return total;
+        }
+        if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+            return 0;
+        }
+        let text = std::fs::read_to_string(path).unwrap_or_default();
+        // Matched per line, not as a substring: an attribute named inside a
+        // comment or a string literal is not a test, and this very file holds
+        // the marker twice that way.
+        text.lines().filter(|line| line.trim() == "#[test]").count()
+    }
+    walk(&repo_root().join(relative))
+}
+
+/// Counts `it(` in the TypeScript suites.
+fn count_ts_tests() -> usize {
+    let dir = repo_root().join("tests");
+    let mut total = 0;
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("ts") {
+                let text = std::fs::read_to_string(&path).unwrap_or_default();
+                // `it(` followed by a quote, not any substring ending in "it(":
+                // `await taskStore.init()` contains one too.
+                total += text
+                    .lines()
+                    .filter(|line| {
+                        line.contains("it('") || line.contains("it(\"") || line.contains("it(`")
+                    })
+                    .count();
+            }
+        }
+    }
+    total
+}
+
+/// The counts stated in the documentation, checked against the source tree.
+///
+/// This number changes on nearly every commit and is the one nobody notices
+/// going stale: the plan said 44 tests where there were 84, and the README
+/// agreed with the plan, so the two agreed with each other and both were
+/// wrong.
+#[test]
+fn the_test_counts_in_the_docs_match_the_code() {
+    let rust_unit = count_tests_in("src-tauri/src");
+    let rust_integration = count_tests_in("src-tauri/tests/integration_tests.rs");
+    let rust_docs = count_tests_in("src-tauri/tests/documentation.rs");
+    let ts = count_ts_tests();
+    let rust_total = rust_unit + rust_integration + rust_docs;
+
+    let plan = std::fs::read_to_string(repo_root().join("docs/TEST_PLAN.md")).unwrap();
+    for (label, actual) in [
+        ("Rust unit", rust_unit),
+        ("Rust integration", rust_integration),
+        ("TypeScript", ts),
+    ] {
+        assert!(
+            plan_has_count(&plan, label, actual),
+            "docs/TEST_PLAN.md does not state {actual} for {label}"
+        );
+    }
+
+    let readme = std::fs::read_to_string(repo_root().join("README.ru.md")).unwrap();
+    assert!(
+        readme_has(&readme, "модульных тестов", ts),
+        "README.ru.md does not state the TypeScript count {ts}"
+    );
+    assert!(
+        readme_has(&readme, "Rust-тестов", rust_total),
+        "README.ru.md does not state the Rust total {rust_total}"
+    );
+}
+
+/// Finds a table row for `label` and checks the number in it.
+fn plan_has_count(plan: &str, label: &str, expected: usize) -> bool {
+    plan.lines().any(|line| {
+        line.starts_with(&format!("| {label} |"))
+            && line
+                .split('|')
+                .any(|cell| cell.trim() == expected.to_string())
+    })
+}
+
+/// Looks for `label` next to `expected` anywhere in the text.
+fn readme_has(text: &str, label: &str, expected: usize) -> bool {
+    text.lines()
+        .any(|line| line.contains(label) && line.contains(&expected.to_string()))
+}
