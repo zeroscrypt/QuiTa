@@ -1,0 +1,12 @@
+# The version the release binaries are built with.
+#
+# Without this, `dtolnay/rust-toolchain@stable` would install whatever stable
+# happened to be on the day of the build — and Dependabot does not update a
+# channel, so nobody would notice when it moved. Two builds of the same commit
+# would then not be the same bytes, which is the thing a release is supposed to
+# promise.
+#
+# The action reads this file, so CI and a local checkout agree by construction.
+[toolchain]
+channel = "1.99.0"
+components = ["rustfmt", "clippy"]
