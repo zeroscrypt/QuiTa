@@ -11,9 +11,13 @@
 
 | Набор | Команда | Тестов |
 |-------|---------|--------|
-| Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 18 |
+| Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 40 |
 | Rust integration | то же | 74 |
-| TypeScript | `pnpm test` | 107 |
+| TypeScript | `pnpm test` | 115 |
+
+Числа берутся из фактического прогона. Если они разошлись с таблицей —
+значит, тесты забыли пересчитать, и это такое же расхождение кода и
+текста, как неверное описание поведения.
 
 Обе платформы проверены сборкой и запуском:
 
