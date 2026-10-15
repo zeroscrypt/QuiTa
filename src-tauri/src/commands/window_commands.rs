@@ -225,6 +225,34 @@ mod tests {
     }
 
     #[test]
+    fn a_side_docked_taskbar_shrinks_the_width_too() {
+        // Windows allows the taskbar on the left or right. It is then the
+        // width that is reduced, and a window sized from the full monitor
+        // would end up underneath it.
+        let work = Rect {
+            x: 72,
+            y: 0,
+            width: SCREEN_W - 72,
+            height: SCREEN_H,
+        };
+        let p = compute_placement(
+            Rect {
+                x: 1000,
+                y: 0,
+                width: 420,
+                height: 600,
+            },
+            work,
+            1.0,
+        );
+        assert!(
+            p.x + p.width as i32 <= work.x + work.width as i32,
+            "the right edge must stay clear of the taskbar"
+        );
+        assert!(p.x >= work.x, "the left edge must clear the taskbar");
+    }
+
+    #[test]
     fn a_work_area_smaller_than_the_window_does_not_panic() {
         // clamp(min, max) panics when min > max, which a short screen combined
         // with the fixed default height can otherwise produce.
