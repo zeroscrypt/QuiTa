@@ -38,14 +38,18 @@ in a different app.
 ```
    ⌘⇧Q             window appears, caret already in the input
    "ping the supplier about the invoice"
-   ⏎                saved, window hides itself
+   ⏎                saved, input cleared, caret stays put
+   "send the invoice to the supplier"
+   ⏎                saved again — as many times as you like
+   +                on the first task, the subtask field behaves the same
    ────
-   ~0.4 s — back in the editor
+   ~0.4 s per task — back in the editor
 ```
 
-The task is saved. That is the whole product. Everything else — tabs, subtasks,
-due dates, drag & drop — exists to make the capture worthwhile *later*, never
-to slow down the moment you write it.
+The task is saved and the caret stays where it was. The window does not hide on
+its own — close it when you are done, not before. That is the whole product.
+Everything else — tabs, subtasks, due dates, drag & drop — exists to make the
+capture worthwhile *later*, never to slow down the moment you write it.
 
 No accounts. No cloud. No telemetry. The database is one SQLite file on your
 disk.
@@ -121,7 +125,7 @@ Windows, `.AppImage` + `.deb` on Linux.
 ## Features
 
 - [x] **Tabs as projects** — create, rename by double click, reorder by drag, automatic colour from a 10-colour palette. Deleting a tab moves its tasks to a neighbour: data loss is impossible.
-- [x] **Subtasks** — exactly one level of nesting, and no more is possible.
+- [x] **Subtasks** — exactly one level deep, and that is the limit.
 - [x] **Due dates** — calendar dates with no timezone shift, overdue tasks highlighted, chips for today / tomorrow / +7 days.
 - [x] **Comments** — autosaved, opened with a double click.
 - [x] **Storm entry** — the field never closes after `Enter`, the caret stays put.

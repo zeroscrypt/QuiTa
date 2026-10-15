@@ -141,3 +141,95 @@ mod tests {
         }
     }
 }
+
+/// Guards the documentation against the exact drift this module is prone to: a
+/// README line naming a platform and pairing it with another platform's
+/// shortcut. Both READMEs once described the Windows combination as the Linux
+/// one while the code registered something else, and nothing noticed.
+#[cfg(test)]
+mod docs {
+    use super::shortcut_label;
+
+    const READMES: [(&str, &str); 2] = [
+        ("README.md", include_str!("../../../README.md")),
+        ("README.ru.md", include_str!("../../../README.ru.md")),
+    ];
+
+    /// How each README spells a platform, and the key it maps to in the code.
+    const PLATFORMS: [(&str, &str); 3] = [
+        ("macOS", "macos"),
+        ("Windows", "windows"),
+        ("Linux", "linux"),
+    ];
+
+    /// Splits a line so each platform keeps the text written just before it.
+    /// In `⌘⇧Q on macOS, Win+Alt+Q on Windows` a label sits in front of its own
+    /// platform, which is how both READMEs are written.
+    fn text_before_each_platform(line: &str) -> Vec<(&'static str, String)> {
+        let mut cursor = 0usize;
+        let mut out: Vec<(&'static str, String)> = Vec::new();
+        while cursor < line.len() {
+            let mut found: Option<(usize, usize, &'static str)> = None;
+            for (name, os) in PLATFORMS {
+                if let Some(at) = line[cursor..].find(name) {
+                    let at = cursor + at;
+                    if found.is_none_or(|(best, _, _)| at < best) {
+                        found = Some((at, at + name.len(), os));
+                    }
+                }
+            }
+            match found {
+                Some((at, end, os)) => {
+                    out.push((os, line[cursor..at].to_string()));
+                    cursor = end;
+                }
+                None => break,
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn readmes_name_the_shortcut_every_platform_uses() {
+        for (file, text) in READMES {
+            for (_, os) in PLATFORMS {
+                assert!(
+                    text.contains(shortcut_label(os)),
+                    "{file} never mentions the {os} shortcut {}",
+                    shortcut_label(os)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn readmes_pair_each_platform_with_its_own_shortcut() {
+        for (file, text) in READMES {
+            for (index, line) in text.lines().enumerate() {
+                let platforms = text_before_each_platform(line);
+                if platforms.is_empty() {
+                    continue;
+                }
+                // Lines that say nothing about shortcuts say nothing about them.
+                if !platforms
+                    .iter()
+                    .any(|(_, os)| line.contains(shortcut_label(os)))
+                {
+                    continue;
+                }
+                for (os, before) in &platforms {
+                    assert!(
+                        before.contains(shortcut_label(os)),
+                        "{}:{} pairs a platform with the wrong shortcut.\n  line: {}\n  \
+                         {} registers {}",
+                        file,
+                        index + 1,
+                        line.trim(),
+                        os,
+                        shortcut_label(os)
+                    );
+                }
+            }
+        }
+    }
+}
