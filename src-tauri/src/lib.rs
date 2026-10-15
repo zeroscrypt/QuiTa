@@ -16,18 +16,6 @@ pub fn run() {
         .setup(|app| {
             db::init(app.handle())?;
 
-            // Closing the window with the X button hides it instead of
-            // quitting; the app stays alive in the tray/menu bar.
-            if let Some(win) = app.get_webview_window("main") {
-                let win_for_events = win.clone();
-                win.on_window_event(move |event| {
-                    if let WindowEvent::CloseRequested { api, .. } = event {
-                        api.prevent_close();
-                        let _ = win_for_events.hide();
-                    }
-                });
-            }
-
             // Neither the tray nor the shortcut is worth failing startup for: the
             // window is already open and usable, and the error would surface
             // as a panic after the window stopped closing normally.
@@ -37,11 +25,35 @@ pub fn run() {
             // case the per-platform combinations exist to survive. Letting the
             // error out would turn a stolen hotkey into an app that will not
             // start at all.
-            if let Err(err) = platform::tray::setup(app.handle()) {
-                eprintln!("QuiTa: tray icon unavailable: {err}");
-            }
+            let tray_ready = match platform::tray::setup(app.handle()) {
+                Ok(()) => true,
+                Err(err) => {
+                    eprintln!("QuiTa: tray icon unavailable: {err}");
+                    false
+                }
+            };
             if let Err(err) = platform::shortcuts::setup(app.handle()) {
                 eprintln!("QuiTa: global shortcut unavailable: {err}");
+            }
+
+            // The tray menu holds the only Quit command. Closing the window
+            // hides it rather than quitting, so without a tray there would be
+            // nothing left to close the app with: no close button that works,
+            // no menu, no shortcut. Hiding the window is only safe once there
+            // is somewhere else to come back from.
+            if let Some(win) = app.get_webview_window("main") {
+                let win_for_events = win.clone();
+                win.on_window_event(move |event| {
+                    if let WindowEvent::CloseRequested { api, .. } = event {
+                        if tray_ready {
+                            api.prevent_close();
+                            let _ = win_for_events.hide();
+                        }
+                    }
+                });
+            }
+            if !tray_ready {
+                eprintln!("QuiTa: no tray icon, so closing the window quits instead of hiding it.");
             }
             Ok(())
         })

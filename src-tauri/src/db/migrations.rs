@@ -121,6 +121,28 @@ ALTER TABLE tasks ADD COLUMN search_text TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_tasks_search_text ON tasks(search_text);
 "#,
     },
+    Migration {
+        version: 6,
+        name: "reject_a_task_that_is_its_own_parent",
+        sql: r#"
+-- A task may not name itself as its parent. The check above only rejects a
+-- parent that is itself a subtask, and in a BEFORE trigger the table still
+-- holds the old row, so `id = parent_id` slipped through: a file carrying
+-- {"id":"x","parentId":"x"} set x.parent_id = x. Such a row is a one-task
+-- cycle, and every listing filters on parent_id IS NULL, so the task
+-- disappeared from every screen with no way to find or delete it.
+DROP TRIGGER IF EXISTS task_no_third_level_update;
+
+CREATE TRIGGER task_no_third_level_update
+BEFORE UPDATE OF parent_id ON tasks
+WHEN NEW.parent_id IS NOT NULL
+  AND (NEW.id = NEW.parent_id
+       OR EXISTS (SELECT 1 FROM tasks WHERE id = NEW.parent_id AND parent_id IS NOT NULL))
+BEGIN
+  SELECT RAISE(ABORT, 'only one subtask level is allowed');
+END;
+"#,
+    },
 ];
 
 /// Applies all pending migrations in order. Migration records are inserted

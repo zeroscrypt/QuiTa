@@ -13,6 +13,11 @@ use crate::error::TaskError;
 /// Name given to the tab created automatically on first launch.
 pub const DEFAULT_TAB_NAME: &str = "Новая вкладка";
 
+/// How far an imported `sort_order` may stray from zero. The bound is generous
+/// compared with any list a person will build, and it keeps `next_sort_order`
+/// and `next_sort_order_at_bottom` a step away from overflowing.
+const SORT_ORDER_LIMIT: i64 = 1 << 40;
+
 const TASK_COLUMNS: &str = "id, parent_id, tab_id, title, created_at, updated_at, completed_at, deleted_at, due_date, comment, sort_order, completion_event_id, auto_completed_by";
 
 fn now_rfc3339() -> String {
@@ -69,7 +74,10 @@ fn next_sort_order(
             |row| row.get::<_, Option<i64>>(0),
         )?,
     };
-    Ok(min.unwrap_or(0) - 1)
+    // Saturating, because an imported file is allowed to carry any sort_order
+    // it likes. At i64::MIN this used to wrap to i64::MAX, which quietly put
+    // a new task at the wrong end of the list; in a debug build it panicked.
+    Ok(min.unwrap_or(0).saturating_sub(1))
 }
 
 pub fn create_task(
@@ -822,7 +830,7 @@ fn next_sort_order_at_bottom(conn: &Connection, parent_id: Option<&str>) -> Resu
             |row| row.get::<_, Option<i64>>(0),
         )?,
     };
-    Ok(max.unwrap_or(0) + 1)
+    Ok(max.unwrap_or(0).saturating_add(1))
 }
 
 /// Moves a task to another parent (`None` makes it a root task) — the backend
@@ -1576,12 +1584,21 @@ pub fn import_tasks(
         // file could hand the UI a field as long as the whole upload limit.
         // A task whose comment is too long loses the comment rather than the
         // task — dropping the task would make an export look like data loss.
+        // The file chooses the order, but not beyond what the arithmetic above
+        // can step away from: a sort_order at the very edge of i64 would make
+        // the next new task overflow.
+        let sort_order = task.sort_order.clamp(-SORT_ORDER_LIMIT, SORT_ORDER_LIMIT);
         let comment = task.comment.as_deref().and_then(|raw| {
             let cleaned = raw.trim();
             (!cleaned.is_empty() && cleaned.chars().count() <= validation::MAX_COMMENT_CHARS)
                 .then(|| cleaned.to_string())
         });
         let parent_ok = match &task.parent_id {
+            // A task may not be its own parent. The database refuses to store
+            // that, but refusing here is what keeps the import from dying on a
+            // trigger abort halfway through a batch: a task whose parent is
+            // missing is imported as a root instead.
+            Some(pid) if pid == &task.id => false,
             Some(pid) => tx
                 .query_row(
                     "SELECT 1 FROM tasks WHERE id = ?1 AND parent_id IS NULL",
@@ -1642,7 +1659,7 @@ pub fn import_tasks(
                     task.deleted_at,
                     task.due_date,
                     comment,
-                    task.sort_order,
+                    sort_order,
                     task.completion_event_id,
                     task.auto_completed_by,
                     task.id
@@ -1667,7 +1684,7 @@ pub fn import_tasks(
                     task.deleted_at,
                     task.due_date,
                     comment,
-                    task.sort_order,
+                    sort_order,
                     task.completion_event_id,
                     task.auto_completed_by
                 ],

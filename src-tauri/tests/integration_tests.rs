@@ -710,6 +710,160 @@ fn an_import_cannot_smuggle_an_oversized_comment() {
 }
 
 #[test]
+fn an_import_cannot_make_a_task_its_own_parent() {
+    // A file claiming `id = parentId` would set a task's parent to itself.
+    // That is a one-task cycle, and every listing filters on
+    // `parent_id IS NULL`, so the task would vanish from every screen with
+    // no way to find or delete it. The database trigger cannot catch it on
+    // update: inside a BEFORE trigger the row still holds its old value.
+    //
+    // The row has to exist before the cycle can be written, which is why this
+    // imports twice. On the second run the parent check finds its own row from
+    // the first run — a root, so the check passes — and the update writes the
+    // cycle. Importing the same backup twice is an ordinary thing to do.
+    let mut conn = open_test_db();
+    let tab = repository::ensure_default_tab(&conn).unwrap();
+    let id = uuid::Uuid::new_v4().to_string();
+    let make = || Task {
+        id: id.clone(),
+        parent_id: Some(id.clone()),
+        tab_id: Some(tab.id.clone()),
+        title: "Сама себе родитель".to_string(),
+        created_at: "2026-01-01T00:00:00Z".to_string(),
+        updated_at: "2026-01-01T00:00:00Z".to_string(),
+        completed_at: None,
+        deleted_at: None,
+        due_date: None,
+        comment: None,
+        sort_order: 0,
+        completion_event_id: None,
+        auto_completed_by: None,
+    };
+
+    repository::import_tasks(&mut conn, &[make()]).unwrap();
+    // This is the call that used to write the cycle.
+    repository::import_tasks(&mut conn, &[make()]).unwrap();
+
+    let parent: Option<String> = conn
+        .query_row(
+            "SELECT parent_id FROM tasks WHERE title = 'Сама себе родитель'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        parent, None,
+        "the task still points at itself, so it is a cycle and no list will show it"
+    );
+
+    // And it has to be reachable again, not merely stored.
+    let listed = repository::list_roots(&conn, false, Some(&tab.id)).unwrap();
+    assert_eq!(listed.len(), 1, "the task must be visible as a root");
+}
+
+#[test]
+fn the_database_refuses_a_task_that_is_its_own_parent() {
+    // The same rule has to hold for any other path into the table, not
+    // only for import.
+    let mut conn = open_test_db();
+    let tab = repository::ensure_default_tab(&conn).unwrap();
+    let id = "self-parent";
+    conn.execute(
+            "INSERT INTO tasks (id, parent_id, tab_id, title, created_at, updated_at, sort_order, search_text)
+             VALUES (?1, NULL, ?2, 'Задача', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', 0, '')",
+            rusqlite::params![id, tab.id],
+        )
+        .unwrap();
+
+    let refused = conn.execute("UPDATE tasks SET parent_id = ?1 WHERE id = ?1", [id]);
+    assert!(
+        refused.is_err(),
+        "the database let a task become its own parent"
+    );
+}
+
+#[test]
+fn an_import_cannot_push_the_next_task_off_the_end_of_the_scale() {
+    // A file may carry any sort_order it likes. At the very edge of i64 the
+    // arithmetic that finds the next position used to wrap: in a release
+    // build a new task silently landed at the wrong end of the list, in a
+    // debug build it panicked.
+    let mut conn = open_test_db();
+    let tab = repository::ensure_default_tab(&conn).unwrap();
+    let edge = Task {
+        id: uuid::Uuid::new_v4().to_string(),
+        parent_id: None,
+        tab_id: Some(tab.id.clone()),
+        title: "На краю".to_string(),
+        created_at: "2026-01-01T00:00:00Z".to_string(),
+        updated_at: "2026-01-01T00:00:00Z".to_string(),
+        completed_at: None,
+        deleted_at: None,
+        due_date: None,
+        comment: None,
+        sort_order: i64::MAX,
+        completion_event_id: None,
+        auto_completed_by: None,
+    };
+    repository::import_tasks(&mut conn, &[edge]).unwrap();
+
+    // This is the call that used to overflow.
+    let created =
+        repository::create_task(&mut conn, "Соседняя задача", None, Some(&tab.id), false).unwrap();
+
+    let stored: i64 = conn
+        .query_row(
+            "SELECT sort_order FROM tasks WHERE id = ?1",
+            [created.id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    // Pulled back to the bound the import allows, and one step past it — not
+    // wrapped round to the other end of the scale.
+    assert_eq!(
+        stored,
+        (1i64 << 40) + 1,
+        "the imported task must be clamped, not wrapped"
+    );
+}
+
+#[test]
+fn a_new_task_below_an_extreme_import_does_not_underflow() {
+    let mut conn = open_test_db();
+    let tab = repository::ensure_default_tab(&conn).unwrap();
+    let edge = Task {
+        id: uuid::Uuid::new_v4().to_string(),
+        parent_id: None,
+        tab_id: Some(tab.id.clone()),
+        title: "На дне".to_string(),
+        created_at: "2026-01-01T00:00:00Z".to_string(),
+        updated_at: "2026-01-01T00:00:00Z".to_string(),
+        completed_at: None,
+        deleted_at: None,
+        due_date: None,
+        comment: None,
+        sort_order: i64::MIN,
+        completion_event_id: None,
+        auto_completed_by: None,
+    };
+    repository::import_tasks(&mut conn, &[edge]).unwrap();
+    let created =
+        repository::create_task(&mut conn, "Соседняя задача", None, Some(&tab.id), true).unwrap();
+    let stored: i64 = conn
+        .query_row(
+            "SELECT sort_order FROM tasks WHERE id = ?1",
+            [created.id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        stored,
+        -((1i64 << 40) + 1),
+        "the step must clamp at the bound instead of wrapping past it"
+    );
+}
+
+#[test]
 fn an_import_keeps_a_comment_inside_the_limit() {
     let mut conn = open_test_db();
     let tab = repository::ensure_default_tab(&conn).unwrap();
