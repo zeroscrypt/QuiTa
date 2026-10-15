@@ -2,14 +2,24 @@ name: Release
 
 # Release Please drives versioning, changelog and tags.
 #
-#   commits into main → a "chore(main): release v1.0.5" pull request appears
-#   merging that PR   → tag + GitHub Release created
+#   commits into main → a "chore(main): release v1.1.1" pull request appears
+#   CI goes green     → that pull request is merged automatically
+#   the merge         → tag + GitHub Release created
 #   the build is then dispatched separately
 #
-# The release is deliberately a pull request rather than a push: it means the
-# version bump and the changelog are reviewed like any other change, and
-# commits that do not deserve a release (docs, CI) produce no pull request at
-# all.
+# A release still travels through a pull request, so the version bump and the
+# changelog stay visible in history instead of appearing out of nowhere. What
+# changed is who presses the button: the second job below waits for the CI of
+# the very commit that produced the release, and merges the pull request once
+# that run is green.
+#
+# The gate is the CI run on main, not the checks on the release PR itself.
+# Release Please creates that PR with the repository's GITHUB_TOKEN, and events
+# caused by that token do not start workflow runs, so there are no checks on
+# that branch to wait for.
+#
+# Commits that do not deserve a release (docs, ci, chore, test) still produce no
+# pull request at all.
 #
 # Why the build is dispatched instead of running on the tag push: release
 # Please creates the tag with the repository's GITHUB_TOKEN, and GitHub does
@@ -59,7 +69,7 @@ jobs:
           if [ "$RELEASED" = "true" ]; then
             echo "::notice::Релиз $TAG создан, запускаю сборку."
           elif [ -n "$PRS" ]; then
-            echo "::notice::Открыт PR с подъёмом версии — посмотрите его перед слиянием."
+            echo "::notice::Открыт PR с подъёмом версии — он слиется автоматически, как пройдёт CI."
           else
             echo "Изменений, достойных релиза, нет (docs/ci/chore в changelog не попадают)."
           fi
@@ -71,3 +81,69 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.release.outputs.tag_name }}
         run: gh workflow run build.yml --ref main -f tag="$TAG"
+
+  # Merges the release PR once the CI of the commit that produced it is green.
+  #
+  # Three ways this deliberately does nothing, each of which is a normal state
+  # rather than a fault:
+  #
+  #   * CI is red          -> the release waits, so a broken main never ships;
+  #   * CI never finishes  -> the wait times out and the release waits for a human;
+  #   * main moved on      -> this PR is stale, Release Please will update it and
+  #                           the next push to main will merge the fresh one.
+  merge-release-pr:
+    name: Merge release PR after CI is green
+    needs: release-please
+    runs-on: ubuntu-latest
+    # Nothing to merge once the tag exists: that is the run that builds.
+    if: needs.release-please.outputs.released != 'true'
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Wait for CI, then merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          number="$(gh pr list --repo "$REPO" --base main --state open \
+            --json number,title --jq '.[] | select(.title | startswith("chore(main): release")) | .number' \
+            | head -n 1)"
+          if [ -z "$number" ]; then
+            echo "No release PR is open, so there is nothing to merge."
+            exit 0
+          fi
+          echo "Release PR #$number, waiting for CI on $SHA"
+
+          conclusion=""
+          for _ in $(seq 1 120); do
+            conclusion="$(gh run list --repo "$REPO" --workflow ci.yml --commit "$SHA" \
+              --json conclusion --jq '.[0].conclusion // "pending"')"
+            case "$conclusion" in
+              success) break ;;
+              pending) sleep 30 ;;
+              *)
+                echo "::warning::CI is not green ($conclusion) - the release waits for a human."
+                exit 0 ;;
+            esac
+          done
+
+          if [ "$conclusion" != "success" ]; then
+            echo "::warning::CI did not finish in time - the release waits for a human."
+            exit 0
+          fi
+
+          # main moving after the PR was written makes this PR describe an
+          # older main, and merging it would release a commit that is no longer
+          # the tip.
+          base="$(gh pr view "$number" --repo "$REPO" --json baseRefOid --jq .baseRefOid)"
+          if [ "$base" != "$SHA" ]; then
+            echo "::notice::main moved on to $base - this PR updates on the next push."
+            exit 0
+          fi
+
+          gh pr merge "$number" --repo "$REPO" --squash --delete-branch
+          echo "::notice::PR #$number merged, the tag builds on the next run."

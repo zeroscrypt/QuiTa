@@ -21,7 +21,18 @@ permissions:
   contents: write
 
 concurrency:
-  group: build-${{ inputs.tag }}
+  # One build at a time, whatever the tag.
+  #
+  # Two builds running together would both write the release assets and
+  # latest.json, and whichever finished last would win, which is how an older
+  # build ends up advertised as the latest and offers downgrades to everyone
+  # on auto-update.
+  #
+  # The limit is worth knowing: GitHub keeps one run pending in a group and
+  # cancels the older pending ones. A release whose build was displaced this
+  # way ends up without installers, which the last job reports. Rebuild one by
+  # hand: gh workflow run build.yml --ref main -f tag=v1.1.1
+  group: build
   cancel-in-progress: false
 
 jobs:
@@ -150,3 +161,34 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag }}
         run: gh release upload "$TAG" dist/SHA256SUMS --clobber
+
+  # Builds queue behind each other, so a release can be skipped: GitHub cancels
+  # the older of two pending runs. The release still exists, it just has no
+  # files, and nobody notices until someone tries to install that version.
+  report-unbuilt-releases:
+    name: Check every release has files
+    needs: [build, checksums]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Warn about releases left without installers
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          empty=0
+          while read -r tag; do
+            [ -n "$tag" ] || continue
+            count="$(gh release view "$tag" --json assets --jq '.assets | length')"
+            if [ "$count" -eq 0 ]; then
+              echo "::warning::$tag has no files. Its build was displaced by a newer one."
+              echo "::warning::Rebuild it with: gh workflow run build.yml --ref main -f tag=$tag"
+              empty=1
+            fi
+          done <<< "$(gh release list --limit 10 --json tagName --jq '.[].tagName')"
+          if [ "$empty" -eq 1 ]; then
+            echo "At least one release has no installers. The newest one was built."
+          else
+            echo "Every recent release has installers."
+          fi
