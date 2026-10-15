@@ -31,6 +31,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # A release that never got created used to stay invisible: nothing in this
+  # workflow noticed that 1.2.1 was merged as a pull request but never became a
+  # tag, so seven consecutive runs failed with nobody alerted. The check below
+  # compares what the manifest promises against what GitHub actually has.
+  schedule:
+    - cron: '17 6 * * *'
 
 permissions:
   contents: write
@@ -175,3 +181,52 @@ jobs:
 
           gh pr merge "$number" --repo "$REPO" --squash --delete-branch
           echo "::notice::PR #$number merged, the tag builds on the next run."
+
+  # Compares what the manifest promises against what GitHub actually holds.
+  # This exists because the failure it looks for is silent by nature: a release
+  # pull request gets merged, the version bump lands in the files, and if the
+  # tag is never created nothing anywhere says so. The installer keeps handing
+  # out the previous release, and an app built from the current code never
+  # offers an update, because it compares its version against a newer one that
+  # was published.
+  audit-release:
+    name: Every merged version reached a release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Compare the manifest with the published releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          checkout="$(mktemp -d)"
+          trap 'rm -rf "$checkout"' EXIT
+          git clone --quiet --depth 1 --branch main "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "$checkout"
+
+          promised="$(sed -n 's/.*"\.": *"\([^"]*\)".*/\1/p' "$checkout/.release-please-manifest.json")"
+          if [ -z "$promised" ]; then
+            echo "::error::could not read a version out of the release-please manifest"
+            exit 1
+          fi
+
+          latest="$(gh release list --repo "$REPO" --limit 20 --json tagName \
+            --jq '[.[].tagName | select(startswith("v"))] | first // ""')"
+          echo "manifest promises: $promised"
+          echo "newest release:    ${latest:-none}"
+
+          if [ -z "$latest" ]; then
+            echo "::error::the repository has no releases at all"
+            exit 1
+          fi
+
+          # Strip the leading v, then compare numerically field by field. A
+          # string comparison would put "1.2.10" before "1.2.9".
+          newest="${latest#v}"
+          if [ "$promised" != "$newest" ]; then
+            echo "::error::version $promised is recorded as released but the newest tag is $latest. A release was merged and never published; /releases/latest serves $newest, so the installer is behind the code."
+            exit 1
+          fi
+
+          echo "every merged version reached a release"
