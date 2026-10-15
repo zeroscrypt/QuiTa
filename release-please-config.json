@@ -10,7 +10,7 @@
         {
           "type": "toml",
           "path": "src-tauri/Cargo.toml",
-          "jsonpath": "$.version"
+          "jsonpath": "$.package.version"
         },
         {
           "type": "json",
@@ -21,13 +21,41 @@
     }
   },
   "changelog-sections": [
-    { "type": "feat", "section": "Новое" },
-    { "type": "fix", "section": "Исправлено" },
-    { "type": "perf", "section": "Производительность" },
-    { "type": "refactor", "section": "Рефакторинг" },
-    { "type": "docs", "section": "Документация", "hidden": true },
-    { "type": "test", "section": "Тесты", "hidden": true },
-    { "type": "ci", "section": "Сборка и CI", "hidden": true },
-    { "type": "chore", "section": "Прочее", "hidden": true }
+    {
+      "type": "feat",
+      "section": "Новое"
+    },
+    {
+      "type": "fix",
+      "section": "Исправлено"
+    },
+    {
+      "type": "perf",
+      "section": "Производительность"
+    },
+    {
+      "type": "refactor",
+      "section": "Рефакторинг"
+    },
+    {
+      "type": "docs",
+      "section": "Документация",
+      "hidden": true
+    },
+    {
+      "type": "test",
+      "section": "Тесты",
+      "hidden": true
+    },
+    {
+      "type": "ci",
+      "section": "Сборка и CI",
+      "hidden": true
+    },
+    {
+      "type": "chore",
+      "section": "Прочее",
+      "hidden": true
+    }
   ]
 }
