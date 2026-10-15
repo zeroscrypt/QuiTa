@@ -271,7 +271,7 @@ frontend (Svelte 5 + TS)  ──invoke──▶  Tauri-команды  ──▶
 | `pnpm tauri dev` | Запуск с горячей перезагрузкой |
 | `pnpm tauri build` | Установщики под текущую платформу |
 | `pnpm check` | Типы Svelte и TypeScript |
-| `pnpm test` | 119 модульных тестов |
+| `pnpm test` | 122 модульных теста |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | 130 Rust-тестов (40 модульных + 86 интеграционных на настоящей базе + 4 на документацию) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Линты, ошибки как предупреждения |
 | `cargo audit` | Уязвимости в зависимостях |

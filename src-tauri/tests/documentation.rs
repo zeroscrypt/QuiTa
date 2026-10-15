@@ -177,8 +177,12 @@ fn the_test_counts_in_the_docs_match_the_code() {
     }
 
     let readme = std::fs::read_to_string(repo_root().join("README.ru.md")).unwrap();
+    // The noun form changes with the number — 119 модульных тестов, 122
+    // модульных теста — so the marker is the part that stays put. Matching the
+    // full phrase would have forced bad grammar into the README to satisfy the
+    // guard.
     assert!(
-        readme_has(&readme, "модульных тестов", ts),
+        readme_has(&readme, "модульных тест", ts),
         "README.ru.md does not state the TypeScript count {ts}"
     );
     assert!(

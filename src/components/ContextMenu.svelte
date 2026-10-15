@@ -56,7 +56,7 @@
   role="menu"
   aria-label={label}
 >
-  {#each items as item (item.type === 'separator' ? 'sep' : item.id)}
+  {#each items as item, i (item.type === 'separator' ? `sep-${i}` : item.id)}
     {#if item.type === 'separator'}
       <div class="menu-separator"></div>
     {:else}
