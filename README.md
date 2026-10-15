@@ -277,10 +277,19 @@ therefore testable without a window.
 
 | | |
 |---|---|
-| App size | 17.6 MB |
-| `.dmg` size | 5.8 MB |
-| Database | ≈210 bytes per task |
-| Query time | 1–3 ms 
+| App size | 17.9 MB — almost entirely the binary |
+| `.dmg` size | 5.8 MB — the same thing compressed |
+| Database | 618 bytes per task |
+| Query time | 1.5 ms to search, 11 ms to list a thousand |
+
+These numbers were measured, not estimated: a database of 1000 tasks takes
+604 KB once compacted. The timings come from that same database — listing a
+thousand tasks takes 11 ms, so on a real database of a few dozen tasks
+everything is orders of magnitude faster.
+
+The size of the database file follows its history rather than the number of
+tasks in it: SQLite does not hand space back until it is compacted. The
+"Compact database" button in settings does that by hand.
 
 ---
 
