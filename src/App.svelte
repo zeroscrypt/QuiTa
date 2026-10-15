@@ -180,6 +180,9 @@
 {#if uiStore.aboutOpen}
   <AboutDialog onClose={() => (uiStore.aboutOpen = false)} />
 {/if}
-{#if uiStore.confirmDelete}
+<!-- Both kinds of confirmation mount the same dialog. Mounting it on
+     confirmDelete alone left a tab deletion setting its own flag with
+     nothing to render it, so the menu item did nothing at all. -->
+{#if uiStore.confirmDelete || uiStore.confirmTabDelete}
   <ConfirmDialog />
 {/if}
