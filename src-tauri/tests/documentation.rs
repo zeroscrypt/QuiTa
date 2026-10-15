@@ -29,6 +29,13 @@ fn referenced_screenshots(line: &str) -> Vec<String> {
         let Some(end) = rest.find('"') else { break };
         let value = &rest[..end];
         if value.starts_with(SCREENSHOT_DIR) {
+            // Screenshots are stored as WebP. A stray .png reference would
+            // render a broken image and the file check below would miss it.
+            assert!(
+                value.ends_with(".webp"),
+                "скриншот должен быть .webp, а не .{}",
+                value.rsplit('.').next().unwrap_or("?")
+            );
             out.push(value.to_string());
         }
         rest = &rest[end + 1..];
@@ -88,7 +95,8 @@ fn screenshots_are_small_enough_to_load_in_a_readme() {
         let size = std::fs::metadata(&path).expect("file metadata").len();
         assert!(
             size < 700 * 1024,
-            "{} weighs {} bytes and would slow the repository page down",
+            "{} weighs {} bytes; a README of six such images would make the \
+             repository page crawl on a phone connection",
             path.display(),
             size
         );

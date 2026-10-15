@@ -55,7 +55,7 @@ No accounts. No cloud. No telemetry. The database is one SQLite file on your
 disk.
 
 <p align="center">
-  <img src="docs/screenshots/tasks.png" width="440" alt="QuiTa: tasks with subtasks, due dates and tabs along the bottom">
+  <img src="docs/screenshots/tasks.webp" width="440" alt="QuiTa: tasks with subtasks, due dates and tabs along the bottom">
 </p>
 
 ### Who it is for
@@ -149,13 +149,13 @@ Windows, `.AppImage` + `.deb` on Linux.
 ### Settings
 
 <p align="center">
-  <img src="docs/screenshots/settings-interface.png" width="215" alt="Language, theme, list view and the global shortcut">
-  <img src="docs/screenshots/settings-tasks.png" width="215" alt="Cascading completion, auto-delete, export and import">
-  <img src="docs/screenshots/settings-database.png" width="215" alt="Database size, active tasks, tabs">
-  <img src="docs/screenshots/settings-trash.png" width="215" alt="Trash with restore">
+  <img src="docs/screenshots/settings-interface.webp" width="215" alt="Language, theme, list view and the global shortcut">
+  <img src="docs/screenshots/settings-tasks.webp" width="215" alt="Cascading completion, auto-delete, export and import">
+  <img src="docs/screenshots/settings-database.webp" width="215" alt="Database size, active tasks, tabs">
+  <img src="docs/screenshots/settings-trash.webp" width="215" alt="Trash with restore">
 </p>
 <p align="center">
-  <img src="docs/screenshots/about.png" width="300" alt="About: version, author, license, update check">
+  <img src="docs/screenshots/about.webp" width="300" alt="About: version, author, license, update check">
 </p>
 
 ### What QuiTa will never do
@@ -268,7 +268,7 @@ therefore testable without a window.
 | `pnpm tauri dev` | Run with hot reload |
 | `pnpm tauri build` | Installers for the current platform |
 | `pnpm check` | Svelte and TypeScript types |
-| `pnpm test` | 115 unit tests |
+| `pnpm test` | 117 unit tests |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | 126 Rust tests (40 unit + 83 integration against a real database + 3 guarding the docs) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Lints, errors as warnings |
 | `cargo audit` | Vulnerabilities in dependencies |

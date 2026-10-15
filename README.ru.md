@@ -56,7 +56,7 @@
 SQLite на вашем диске.
 
 <p align="center">
-  <img src="docs/screenshots/tasks.png" width="440" alt="QuiTa: задачи с подзадачами, сроками и вкладками внизу">
+  <img src="docs/screenshots/tasks.webp" width="440" alt="QuiTa: задачи с подзадачами, сроками и вкладками внизу">
 </p>
 
 ### Для кого
@@ -151,13 +151,13 @@ Windows, `.AppImage` + `.deb` на Linux.
 ### Настройки
 
 <p align="center">
-  <img src="docs/screenshots/settings-interface.png" width="215" alt="Язык, тема, вид списка и горячая клавиша">
-  <img src="docs/screenshots/settings-tasks.png" width="215" alt="Каскадное завершение, автоудаление, экспорт и импорт">
-  <img src="docs/screenshots/settings-database.png" width="215" alt="Размер базы, активные задачи, вкладки">
-  <img src="docs/screenshots/settings-trash.png" width="215" alt="Корзина с восстановлением">
+  <img src="docs/screenshots/settings-interface.webp" width="215" alt="Язык, тема, вид списка и горячая клавиша">
+  <img src="docs/screenshots/settings-tasks.webp" width="215" alt="Каскадное завершение, автоудаление, экспорт и импорт">
+  <img src="docs/screenshots/settings-database.webp" width="215" alt="Размер базы, активные задачи, вкладки">
+  <img src="docs/screenshots/settings-trash.webp" width="215" alt="Корзина с восстановлением">
 </p>
 <p align="center">
-  <img src="docs/screenshots/about.png" width="300" alt="О программе: версия, автор, лицензия, проверка обновлений">
+  <img src="docs/screenshots/about.webp" width="300" alt="О программе: версия, автор, лицензия, проверка обновлений">
 </p>
 
 ### Чего в QuiTa не будет
@@ -271,7 +271,7 @@ frontend (Svelte 5 + TS)  ──invoke──▶  Tauri-команды  ──▶
 | `pnpm tauri dev` | Запуск с горячей перезагрузкой |
 | `pnpm tauri build` | Установщики под текущую платформу |
 | `pnpm check` | Типы Svelte и TypeScript |
-| `pnpm test` | 115 модульных тестов |
+| `pnpm test` | 117 модульных тестов |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | 126 Rust-тестов (40 модульных + 83 интеграционных на настоящей базе + 3 на документацию) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Линты, ошибки как предупреждения |
 | `cargo audit` | Уязвимости в зависимостях |
