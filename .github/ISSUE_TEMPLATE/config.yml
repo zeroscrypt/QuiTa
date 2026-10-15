@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Вопрос или идея
+    url: https://github.com/zeroscrypt/QuiTa/discussions
+    about: Спросить или предложить, прежде чем заводить issue.
