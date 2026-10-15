@@ -31,10 +31,18 @@ pub fn run() {
             // Neither the tray nor the shortcut is worth failing startup for: the
             // window is already open and usable, and the error would surface
             // as a panic after the window stopped closing normally.
+            //
+            // The shortcut matters here: when another application already owns
+            // the combination, registration fails — and that is precisely the
+            // case the per-platform combinations exist to survive. Letting the
+            // error out would turn a stolen hotkey into an app that will not
+            // start at all.
             if let Err(err) = platform::tray::setup(app.handle()) {
                 eprintln!("QuiTa: tray icon unavailable: {err}");
             }
-            platform::shortcuts::setup(app.handle())?;
+            if let Err(err) = platform::shortcuts::setup(app.handle()) {
+                eprintln!("QuiTa: global shortcut unavailable: {err}");
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
