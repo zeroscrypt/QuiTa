@@ -127,7 +127,7 @@ Windows, `.AppImage` + `.deb` on Linux.
 - [x] **Dark and light theme** — follows the system or pinned manually.
 - [x] **Русский and English** — switched in settings, applied immediately.
 - [x] **Lives in the tray** — closing the window hides the app instead of quitting.
-- [x] **Hotkey** — `⌘⇧Q` on macOS, `Win+Alt+Q` on Windows and Linux, opens the window with the caret in the input.
+- [x] **Hotkey** — `⌘⇧Q` on macOS, `Win+Alt+Q` on Windows, `Ctrl+Alt+Q` on Linux — opens the window with the caret in the input.
 - [x] **Export and import** — a snapshot of the whole app as JSON.
 - [x] **In-app updates** — a green strip above the tabs: "Version 1.1.4 is available".
 - [x] **Resizable window** — double-click the logo to fill the height and widen by 1.6×.

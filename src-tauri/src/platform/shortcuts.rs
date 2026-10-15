@@ -9,32 +9,45 @@ use crate::platform::tray::show_main_window;
 /// utility that is toggled from anywhere.
 pub const SHORTCUT_MACOS: &str = "CmdOrCtrl+Shift+Q";
 
-/// Accelerator on Windows and Linux: the Super (Windows) key with Alt+Q.
+/// Accelerator on Windows: the Super key with Alt+Q.
 ///
 /// `CmdOrCtrl+Shift+Q` would become Ctrl+Shift+Q there. Windows does not
 /// reserve that combination itself, but plenty of applications claim it as a
 /// global hotkey — a running Telegram or a JetBrains IDE can take it before we
 /// register, and then the shortcut never fires for us. Super+Alt+Q is not bound
-/// by the system and is rarely claimed by anything else, on both systems.
-pub const SHORTCUT_OTHER: &str = "Super+Alt+Q";
+/// by the system and is rarely claimed by anything else.
+pub const SHORTCUT_WINDOWS: &str = "Super+Alt+Q";
+
+/// Accelerator on Linux: Ctrl+Alt+Q.
+///
+/// The Super key was tried first and dropped: desktop environments and window
+/// managers normally claim it for "show desktop" or workspace switching, and
+/// when one does, the shortcut silently never fires. Ctrl+Alt is not bound by
+/// any desktop environment.
+///
+/// The caveat is keyboard layouts: on layouts where Ctrl+Alt produces AltGr
+/// (German, Polish and others) the combination may not arrive as Ctrl+Alt+Q.
+/// That is a property of the layout, not of the app, and it is why the
+/// combination is named rather than fixed.
+pub const SHORTCUT_LINUX: &str = "Ctrl+Alt+Q";
 
 /// The accelerator to register for the given target OS, in the spelling the
 /// `Shortcut` parser understands.
 pub fn shortcut_for(target_os: &str) -> &'static str {
-    if target_os == "macos" {
-        SHORTCUT_MACOS
-    } else {
-        SHORTCUT_OTHER
+    match target_os {
+        "macos" => SHORTCUT_MACOS,
+        "linux" => SHORTCUT_LINUX,
+        _ => SHORTCUT_WINDOWS,
     }
 }
 
 /// The same combination written the way the user's keyboard labels it, for the
 /// settings hint and the documentation.
 pub fn shortcut_label(target_os: &str) -> &'static str {
-    if target_os == "macos" {
-        "⌘⇧Q"
-    } else {
-        "Win+Alt+Q"
+    match target_os {
+        "macos" => "⌘⇧Q",
+        "linux" => "Ctrl+Alt+Q",
+        _ => "Win+Alt+Q",
     }
 }
 
@@ -76,13 +89,35 @@ mod tests {
     }
 
     #[test]
-    fn windows_and_linux_use_super_alt() {
+    fn windows_uses_super_alt() {
         // Not because Windows reserves Ctrl+Shift+Q — it does not — but
         // because other applications register it globally and can win the race.
         assert_eq!(shortcut_for("windows"), "Super+Alt+Q");
-        assert_eq!(shortcut_for("linux"), "Super+Alt+Q");
         assert_eq!(shortcut_label("windows"), "Win+Alt+Q");
-        assert_eq!(shortcut_label("linux"), "Win+Alt+Q");
+    }
+
+    #[test]
+    fn linux_avoids_the_super_key() {
+        // Desktop environments claim Super for the workspace and the desktop.
+        assert_eq!(shortcut_for("linux"), "Ctrl+Alt+Q");
+        assert_eq!(shortcut_label("linux"), "Ctrl+Alt+Q");
+        assert!(
+            !shortcut_for("linux").contains("Super"),
+            "Super is the key window managers take on Linux"
+        );
+    }
+
+    #[test]
+    fn every_platform_gets_its_own_combination() {
+        // A single shared string is what made the Windows shortcut unusable.
+        let all = ["macos", "windows", "linux"].map(shortcut_for);
+        assert_eq!(all[0], "CmdOrCtrl+Shift+Q");
+        assert_eq!(all[1], "Super+Alt+Q");
+        assert_eq!(all[2], "Ctrl+Alt+Q");
+        assert_eq!(
+            all.iter().collect::<std::collections::HashSet<_>>().len(),
+            3
+        );
     }
 
     #[test]
