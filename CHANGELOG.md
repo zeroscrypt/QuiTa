@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.1](https://github.com/zeroscrypt/QuiTa/compare/v1.2.0...v1.2.1) (2026-10-15)
+
+
+### Исправлено
+
+* **security:** релизный PR сливается только тот, что открыл Release Please ([8336ddf](https://github.com/zeroscrypt/QuiTa/commit/8336ddf7df84869ae608776d60224a7dde978b90))
+* **tabs:** диалог удаления вкладки не открывался вовсе ([1fda14f](https://github.com/zeroscrypt/QuiTa/commit/1fda14f01810d1c3b08de6e5808c9b1f969ebede))
+* дыры, найденные сквозной проверкой релиза и кода ([f497370](https://github.com/zeroscrypt/QuiTa/commit/f497370dd9af3302eb72660e34d668a081357004))
+
 ## [1.2.0](https://github.com/zeroscrypt/QuiTa/compare/v1.1.0...v1.2.0) (2026-10-15)
 
 
