@@ -25,6 +25,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # `gh workflow run build.yml` needs this: without it the dispatch to the
+  # build workflow is refused with "Resource not accessible by integration".
+  actions: write
 
 concurrency:
   group: release-please
