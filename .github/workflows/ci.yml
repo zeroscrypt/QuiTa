@@ -49,13 +49,28 @@ jobs:
           fetch-depth: 0
 
       - id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          before="${{ github.event.before }}"
-          head="${{ github.sha }}"
+          head="$HEAD_SHA"
 
-          # On the first push to a new branch there is nothing to compare
-          # against, and the whole tree is treated as changed.
+          # A push event carries the previous head in `before`. A pull request
+          # event has no such field at the top level, so it arrived empty, the
+          # base commit did not resolve, and every pull request concluded
+          # "nothing to compare against" — three full Tauri builds for a
+          # one-line workflow edit. On a pull request the base of comparison is
+          # the merge base with the branch it targets.
+          if [ "$EVENT" = "pull_request" ]; then
+            before="$(git merge-base "$BASE_SHA" "$head" 2>/dev/null || true)"
+          else
+            before="$BEFORE"
+          fi
+
+          # With nothing to compare against, the whole tree is treated as changed.
           if ! git cat-file -e "$before^{commit}" 2>/dev/null; then
             echo "app=yes" >> "$GITHUB_OUTPUT"
             echo "rust=yes" >> "$GITHUB_OUTPUT"
@@ -66,7 +81,7 @@ jobs:
           changed="$(git diff --name-only "$before" "$head")"
 
           if printf '%s\n' "$changed" \
-            | grep -qE '^(src/|src-tauri/|tests/|scripts/|package\.json|pnpm-lock\.yaml)'; then
+            | grep -qE '^(src/|src-tauri/|tests/|scripts/|package\.json|pnpm-lock\.yaml|vite\.config\.ts|svelte\.config\.js|tsconfig\.json|pnpm-workspace\.yaml|\.npmrc)'; then
             echo "app=yes" >> "$GITHUB_OUTPUT"
             echo "rust=yes" >> "$GITHUB_OUTPUT"
           else
@@ -286,20 +301,43 @@ jobs:
           $exe = @($candidates)[0]
           Write-Host "Installed to $exe"
 
+          # Polled rather than slept for a fixed ten seconds: a cold runner
+          # initialises the webview far slower than a warm machine, and a fixed
+          # sleep turns a slow start into a red build. The database is created
+          # in `setup`, so it appearing is the signal that the app got that far.
+          $db = Join-Path $env:APPDATA 'com.quita.app'
           $app = Start-Process $exe -PassThru
-          Start-Sleep -Seconds 10
-          if ($app.HasExited) {
-            throw "the app quit on its own with exit code $($app.ExitCode)"
+          $deadline = (Get-Date).AddSeconds(60)
+          $found = $null
+          while ((Get-Date) -lt $deadline) {
+            $found = Get-ChildItem "$db\quita.db*" -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+            if ($found -or $app.HasExited) { break }
+            Start-Sleep -Seconds 2
           }
 
-          # The database is written on the first launch, so finding it proves
-          # the app got past initialisation and opened its own storage rather
-          # than sitting there with a window and no state.
-          $db = Get-ChildItem "$env:APPDATA\com.quita.app\quita.db*" -ErrorAction SilentlyContinue
-          if (-not $db) {
-            throw "the app is running but wrote no database in $env:APPDATA\com.quita.app"
+          if (-not $found) {
+            # Say what actually happened. "no database" on its own cannot be
+            # acted on, and this test has failed five times without ever
+            # explaining itself.
+            Write-Host "app pid $($app.Id), exited: $($app.HasExited)"
+            if ($app.HasExited) { Write-Host "exit code: $($app.ExitCode)" }
+            Write-Host "APPDATA: $env:APPDATA"
+            Write-Host "contents of APPDATA:"
+            Get-ChildItem $env:APPDATA -ErrorAction SilentlyContinue |
+              ForEach-Object { Write-Host "  $($_.Name)" }
+            Write-Host "contents of the expected data directory, if any:"
+            if (Test-Path $db) {
+              Get-ChildItem $db -Recurse -ErrorAction SilentlyContinue |
+                ForEach-Object { Write-Host "  $($_.FullName)" }
+            } else {
+              Write-Host "  (directory does not exist)"
+            }
+            throw "the app did not create a database in $db within 60 seconds"
           }
-          Write-Host "Running as pid $($app.Id), database: $(@($db)[0].Name)"
+          Write-Host "database: $($found.Name)"
+
+          Write-Host "running as pid $($app.Id)"
 
       - name: Remove the app again
         if: always()
