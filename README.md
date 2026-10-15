@@ -269,7 +269,7 @@ therefore testable without a window.
 | `pnpm tauri build` | Installers for the current platform |
 | `pnpm check` | Svelte and TypeScript types |
 | `pnpm test` | 115 unit tests |
-| `cargo test --manifest-path src-tauri/Cargo.toml` | 114 Rust tests (40 unit + 74 integration against a real database) |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | 121 Rust tests (40 unit + 78 integration against a real database + 3 guarding the docs) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Lints, errors as warnings |
 | `cargo audit` | Vulnerabilities in dependencies |
 

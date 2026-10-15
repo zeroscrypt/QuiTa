@@ -2,7 +2,7 @@
 
 ## Обзор
 
-База данных SQLite с тремя таблицами: `tasks`, `settings`, `schema_migrations`. Все данные хранятся в файле `quita.db` в каталоге приложения Tauri.
+База данных SQLite с четырьмя таблицами: `tasks`, `tabs`, `settings`, `schema_migrations`. Все данные хранятся в файле `quita.db` в каталоге приложения Tauri.
 
 ## Диаграмма
 
@@ -12,19 +12,32 @@
 ├─────────────────────────────────────────────┤
 │ id (PK, TEXT)                               │
 │ parent_id (FK → tasks.id, nullable)         │
+│ tab_id (FK → tabs.id, nullable)             │
 │ title (TEXT, NOT NULL)                      │
+│ search_text (TEXT, NOT NULL)                │
 │ created_at (TEXT, NOT NULL)                 │
 │ updated_at (TEXT, NOT NULL)                 │
 │ completed_at (TEXT, nullable)               │
 │ deleted_at (TEXT, nullable)                 │
 │ due_date (TEXT, nullable)                   │
+│ comment (TEXT, nullable)                    │
 │ sort_order (INTEGER, NOT NULL)              │
 │ completion_event_id (TEXT, nullable)        │
 │ auto_completed_by (TEXT, nullable)          │
 └─────────────────────────────────────────────┘
-          │ parent_id
-          │ (один уровень)
-          ▼
+      ▲ tab_id                    ↺ parent_id (один уровень)
+
+┌─────────────────────────────────────────────┐
+│                  tabs                       │
+├─────────────────────────────────────────────┤
+│ id (PK, TEXT)                               │
+│ name (TEXT, NOT NULL)                       │
+│ color (TEXT, NOT NULL)                      │
+│ sort_order (INTEGER, NOT NULL)              │
+│ created_at (TEXT, NOT NULL)                 │
+│ updated_at (TEXT, NOT NULL)                 │
+└─────────────────────────────────────────────┘
+
 ┌─────────────────────────────────────────────┐
 │                 settings                    │
 ├─────────────────────────────────────────────┤
@@ -49,12 +62,15 @@
 |------|-----|------|----------|
 | `id` | TEXT | Нет | UUID v4, первичный ключ |
 | `parent_id` | TEXT | Да | ID родительской задачи. NULL для корневых задач |
+| `tab_id` | TEXT | Да | ID вкладки. NULL у строк, созданных до появления вкладок: они показываются в первой |
 | `title` | TEXT | Нет | Название задачи (обрезанное) |
+| `search_text` | TEXT | Нет | Название в нижнем регистре, пишется из Rust. Поиск идёт по нему: `LIKE` в SQLite складывает регистр только для ASCII, поэтому без этой копии «МОЛОКО» не нашло бы «Молоко» |
 | `created_at` | TEXT | Нет | Время создания (RFC 3339 UTC) |
 | `updated_at` | TEXT | Нет | Время последнего обновления (RFC 3339 UTC) |
 | `completed_at` | TEXT | Да | Время завершения (RFC 3339 UTC). NULL если не завершена |
 | `deleted_at` | TEXT | Да | Время мягкого удаления (RFC 3339 UTC). NULL если не удалена |
 | `due_date` | TEXT | Да | Календарная дата (YYYY-MM-DD). NULL если не установлен |
+| `comment` | TEXT | Да | Свободный комментарий. NULL если его нет |
 | `sort_order` | INTEGER | Нет | Порядок сортировки. Новые задачи получают min-1 |
 | `completion_event_id` | TEXT | Да | UUID события завершения родителя. Только для корневых задач |
 | `auto_completed_by` | TEXT | Да | completion_event_id родителя, завершившего эту подзадачу |
@@ -76,6 +92,22 @@
 - **`due_date`** — календарная дата без времени и таймзоны (YYYY-MM-DD)
 - **`created_at`, `updated_at`, `completed_at`, `deleted_at`** — полные timestamp в RFC 3339 UTC
 
+## Таблица `tabs`
+
+### Поля
+
+| Поле | Тип | NULL | Описание |
+|------|-----|------|----------|
+| `id` | TEXT | Нет | UUID v4, первичный ключ |
+| `name` | TEXT | Нет | Название вкладки |
+| `color` | TEXT | Нет | Цвет `#rrggbb` из палитры `TAB_COLORS`, назначается автоматически |
+| `sort_order` | INTEGER | Нет | Порядок вкладок в полосе |
+| `created_at` | TEXT | Нет | Время создания (RFC 3339 UTC) |
+| `updated_at` | TEXT | Нет | Время последнего обновления (RFC 3339 UTC) |
+
+Подзадача наследует вкладку родителя, поэтому дерево задач никогда не
+разрывается между вкладками.
+
 ## Таблица `settings`
 
 ### Поля
@@ -91,6 +123,12 @@
 |------|----------|----------|
 | `theme` | `system` / `light` / `dark` | Тема оформления |
 | `show_completed` | `0` / `1` | Показывать завершённые задачи |
+| `cascade_complete` | `0` / `1` | Завершение родителя завершает подзадачи |
+| `auto_delete_days` | число / пусто | Автоочистка корзины через N дней. **По умолчанию выключена** (значение отсутствует) |
+| `language` | `ru` / `en` | Язык интерфейса |
+| `expand_subtasks` | `0` / `1` | Раскрывать подзадачи по умолчанию |
+| `show_tab_counts` | `0` / `1` | Счётчики задач на вкладках |
+| `newest_first` | `0` / `1` | Новые задачи сверху, иначе снизу |
 
 ## Таблица `schema_migrations`
 
@@ -104,12 +142,15 @@
 
 ## Индексы
 
-| Индекс | Поля | Тип | Назначение |
-|--------|------|-----|------------|
-| `idx_tasks_active_roots` | `sort_order` | Partial (WHERE deleted_at IS NULL AND parent_id IS NULL) | Быстрый поиск активных корневых задач |
-| `idx_tasks_subtasks` | `parent_id, sort_order` | Partial (WHERE deleted_at IS NULL AND parent_id IS NOT NULL) | Быстрый поиск подзадач |
-| `idx_tasks_title` | `title` | Full | Поиск по названию |
-| `idx_tasks_deleted` | `deleted_at` | Partial (WHERE deleted_at IS NOT NULL) | Поиск удалённых задач |
+| Индекс | Таблица | Поля | Тип | Назначение |
+|--------|---------|------|-----|------------|
+| `idx_tasks_active_roots` | tasks | `sort_order` | Partial (WHERE deleted_at IS NULL AND parent_id IS NULL) | Быстрый поиск активных корневых задач |
+| `idx_tasks_subtasks` | tasks | `parent_id, sort_order` | Partial (WHERE deleted_at IS NULL AND parent_id IS NOT NULL) | Быстрый поиск подзадач |
+| `idx_tasks_title` | tasks | `title` | Full | Поиск по названию |
+| `idx_tasks_deleted` | tasks | `deleted_at` | Partial (WHERE deleted_at IS NOT NULL) | Поиск удалённых задач |
+| `idx_tasks_by_tab` | tasks | `tab_id, sort_order` | Partial (WHERE deleted_at IS NULL) | Выборка задач вкладки |
+| `idx_tasks_search_text` | tasks | `search_text` | Full | Регистронезависимый поиск по названию |
+| `idx_tabs_order` | tabs | `sort_order` | Full | Порядок вкладок |
 
 ## Триггеры
 

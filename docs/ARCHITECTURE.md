@@ -16,7 +16,10 @@ QuiTa — desktop-приложение на Tauri 2, использующее Sv
 │              Tauri Commands                 │
 │  commands/task_commands.rs                  │
 │  commands/settings_commands.rs              │
-│  commands/export_commands.rs              │
+│  commands/export_commands.rs                │
+│  commands/app_commands.rs                   │
+│  commands/tab_commands.rs                   │
+│  commands/window_commands.rs                │
 └──────────────────┬──────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────┐
@@ -57,11 +60,17 @@ src/
 │   ├── TabsBar.svelte
 │   ├── TaskItem.svelte
 │   ├── TaskList.svelte
-│   └── UndoNotice.svelte
+│   ├── UndoNotice.svelte
+│   └── UpdateBanner.svelte
 ├── domain/                 # Чистые функции (зеркало Rust)
 │   ├── taskRules.ts
 │   └── taskValidation.ts
+├── i18n/                   # Словари ru/en и переключение языка
+│   ├── en.ts
+│   ├── index.svelte.ts
+│   └── ru.ts
 ├── lib/                    # Чистые функции и типы
+│   ├── capture.ts          # ритм полей ввода задач
 │   ├── menuTypes.ts
 │   ├── scroll.ts           # прокрутка по прямоугольникам
 │   ├── text.ts             # обрезка по длине, не по словам
@@ -74,14 +83,17 @@ src/
 │   ├── settingsService.ts
 │   ├── tabService.ts
 │   ├── taskService.ts
+│   ├── updateService.ts
 │   └── windowService.ts
 └── stores/
+    ├── appStore.svelte.ts
     ├── dbStore.svelte.ts
     ├── dragStore.svelte.ts      # pointer-перетаскивание
     ├── settingsStore.svelte.ts
     ├── tabStore.svelte.ts
     ├── taskStore.svelte.ts
-    └── uiStore.svelte.ts
+    ├── uiStore.svelte.ts
+    └── updateStore.svelte.ts
 ```
 
 > **Важно:** модули с runes обязаны иметь расширение `.svelte.ts`.
@@ -98,7 +110,11 @@ src/
 
 ### Связь с бэкендом
 
-Все обращения к данным через `src/services/taskService.ts`, который вызывает Tauri commands через `invoke`.
+Все обращения к данным идут через сервисы в `src/services/` — по одному на
+область (`taskService`, `tabService`, `settingsService`, `exportService`,
+`appService`, `dbService`, `updateService`, `windowService`). Все они, кроме
+`updateService`, вызывают Tauri commands через `invoke`; проверка обновлений
+идёт через JS API плагина updater.
 
 ### Контракт сериализации
 
@@ -121,9 +137,13 @@ src-tauri/src/
 ├── lib.rs                  # Точка входа Tauri
 ├── main.rs                 # Точка входа приложения
 ├── commands/               # Tauri commands
+│   ├── app_commands.rs
 │   ├── export_commands.rs
+│   ├── mod.rs
 │   ├── settings_commands.rs
-│   └── task_commands.rs
+│   ├── tab_commands.rs
+│   ├── task_commands.rs
+│   └── window_commands.rs
 ├── db/                     # Слой данных
 │   ├── mod.rs              # Инициализация, Db State
 │   ├── migrations.rs       # Миграции схемы
@@ -132,9 +152,11 @@ src-tauri/src/
 │   ├── mod.rs
 │   ├── task.rs             # Типы задач, TaskNode, SearchResult
 │   ├── rules.rs            # Правила завершения (compute_toggle_plan)
+│   ├── transfer.rs         # Формат экспорта/импорта (JSON)
 │   └── validation.rs       # Валидация дат и названий
 ├── error.rs                # Типизированные ошибки
 └── platform/               # Платформенный слой
+    ├── mod.rs
     ├── tray.rs             # Трей-иконка
     └── shortcuts.rs        # Глобальные горячие клавиши
 ```
@@ -169,7 +191,7 @@ src-tauri/src/
 **Миграции:**
 - `db/migrations.rs` — таблица `schema_migrations` с версиями
 - Миграции применяются последовательно при запуске
-- Текущая версия: 1 (`create_tasks_and_settings`)
+- Текущая версия: 4 — `create_tasks_and_settings` (1), `add_tabs` (2), `add_task_comment` (3), `add_task_search_text` (4)
 
 **Транзакции:**
 - Все операции записи выполняются в транзакциях
@@ -183,8 +205,9 @@ src-tauri/src/
 
 **Трей (`platform/tray.rs`):**
 - Иконка в системном трее / меню-баре
-- Левый клик — показать/скрыть окно
-- Меню: «Открыть QuiTa» / «Выйти»
+- Левый клик — показать окно (скрытия по клику нет)
+- Меню: «Open QuiTa / Открыть QuiTa», «About / О программе», разделитель, «Quit / Выйти»
+- Подписи двуязычные: меню строит система до того, как известен язык интерфейса
 
 Цвет значка выбирается по теме, а не зашит в картинку. Форма строки задана
 альфа-каналом в `icons/tray-icon.svg`, а пиксели перекрашиваются при загрузке:
@@ -276,7 +299,7 @@ GitHub из Rust, а не из вебвью, поэтому CSP остаётся
 |-----|--------|
 | Размер файла | Отказ свыше 64 МБ до чтения — иначе пользователь, по ошибке указавший много гигабайт, вытянет файл в память целиком |
 | Формат | Только JSON; YAML и XML отклоняются с объяснением |
-| Заголовок задачи | Обрезается и проверяется на те же 500 символов, что и ввод с клавиатуры; нарушитель пропускается и считается в отчёте |
+| Заголовок задачи | Проверяется на те же 500 символов, что и ввод с клавиатуры; слишком длинная строка отбрасывается и попадает в счётчик `skipped` |
 | Цвет вкладки | Принимается только из палитры |
 | Идентификаторы | Слияние по `id`, ничего не удаляется |
 
