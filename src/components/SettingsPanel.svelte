@@ -10,6 +10,7 @@
   import type { Task } from '$lib/types';
   import { t } from '$i18n';
   import { fill } from '$lib/text';
+  import { trapFocus } from '$lib/focusTrap';
   import * as taskService from '$services/taskService';
   import InfoHint from './InfoHint.svelte';
 
@@ -201,7 +202,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div class="backdrop" onclick={onBackdropClick} role="presentation">
-  <div class="dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div class="dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title" tabindex="-1" use:trapFocus>
     <div class="settings-header">
       <h2 id="settings-title" class="dialog-title">{t('settings.title')}</h2>
       <button
@@ -612,7 +613,7 @@
 {#if purgeAllConfirm}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
   <div class="backdrop" onclick={() => (purgeAllConfirm = false)} role="presentation">
-    <div class="dialog" role="alertdialog" aria-modal="true">
+    <div class="dialog" role="alertdialog" aria-modal="true" tabindex="-1" use:trapFocus>
       <h2 class="dialog-title">{t('delete.title')}</h2>
       <p class="dialog-message">{t('settings.purgeAllConfirm', { count: String(deleted.length) })}</p>
       <div class="dialog-actions">
@@ -630,7 +631,7 @@
 {#if purgeConfirm}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
   <div class="backdrop" onclick={() => (purgeConfirm = null)} role="presentation">
-    <div class="dialog" role="alertdialog" aria-modal="true">
+    <div class="dialog" role="alertdialog" aria-modal="true" tabindex="-1" use:trapFocus>
       <h2 class="dialog-title">{t('delete.title')}</h2>
       <p class="dialog-message">
         {fill(t('settings.deleteForeverConfirm'), 'title', purgeConfirm.title)}

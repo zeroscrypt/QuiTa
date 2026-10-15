@@ -5,6 +5,7 @@
   import { settingsStore } from '$stores/settingsStore.svelte';
   import { updateStore } from '$stores/updateStore.svelte';
   import { openUrl } from '@tauri-apps/plugin-opener';
+  import { trapFocus } from '$lib/focusTrap';
 
   let { onClose }: { onClose: () => void } = $props();
 
@@ -38,7 +39,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div class="backdrop" onclick={onBackdropClick} role="presentation">
-  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="about-title">
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="about-title" tabindex="-1" use:trapFocus>
     <h2 id="about-title" class="dialog-title">{t('about.title')}</h2>
 
     <p class="about-text">

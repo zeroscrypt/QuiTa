@@ -5,6 +5,7 @@
   import { truncate } from '$domain/taskRules';
   import { t } from '$i18n';
   import { fill } from '$lib/text';
+  import { trapFocus } from '$lib/focusTrap';
 
   const deleteState = $derived(uiStore.confirmDelete);
   const tabState = $derived(uiStore.confirmTabDelete);
@@ -58,6 +59,7 @@
     <div
     class="dialog"
     tabindex="-1"
+    use:trapFocus
     onkeydown={onDialogKeydown}
     role="alertdialog"
     aria-modal="true"
