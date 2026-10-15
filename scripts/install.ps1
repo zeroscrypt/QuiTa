@@ -180,6 +180,31 @@ try {
   Write-Step "Downloading $($asset.name)"
   Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $file -UseBasicParsing
 
+  # Authenticity, not just integrity. SHA256SUMS travels in the same release
+  # as the file it describes, so a compromised account can change both at
+  # once. The signature is published under the key already baked into every
+  # installed copy, and verifying it is what closes that gap. minisign is
+  # rarely present on Windows, so this reports rather than skipping quietly.
+  Write-Step 'Verifying the signature'
+  $minisign = Get-Command minisign -ErrorAction SilentlyContinue
+  if ($minisign) {
+    $pubFile = Join-Path $tmp 'quita.pub'
+    [IO.File]::WriteAllBytes($pubFile, [Convert]::FromBase64String('dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk1NEUwMjBERDg3MDFGMUYKUldRZkgzRFlEUUpPbGY2VzNiendWSXlhbXJDenpnM1BTMDN6NVJBbUZNSXFNQ1lzYkpLeEZGT2gK'))
+    $sigFile = Join-Path $tmp "$($asset.name).sig"
+    try {
+      Invoke-WebRequest -Uri "$($asset.browser_download_url).sig" -OutFile $sigFile -UseBasicParsing
+    } catch {
+      Write-Warning 'no signature published for this file; only the checksum was checked'
+    }
+    if (Test-Path $sigFile) {
+      & $minisign.Source -V -q -p $pubFile -m $file -x $sigFile
+      if ($LASTEXITCODE -ne 0) { throw 'The signature does not match - refusing to install' }
+      Write-Note 'signed by the release key'
+    }
+  } else {
+    Write-Warning 'minisign is not installed, so the signature could not be checked.'
+  }
+
   Write-Step 'Verifying SHA-256'
   $expected = $null
   $sumsFile = Join-Path $tmp 'SHA256SUMS'

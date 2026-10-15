@@ -211,6 +211,40 @@ step "Downloading $ASSET_NAME"
 curl -fL --progress-bar -o "$TMP_DIR/$ASSET_NAME" "$ASSET_URL" \
   || die "download failed: $ASSET_URL"
 
+# Authenticity, not just integrity.
+#
+# SHA256SUMS travels in the same release as the file it describes, so it
+# proves the download was not corrupted — it does not prove the release was
+# not tampered with. A compromised account can change both together. The
+# signature is the one artefact published under the key already baked into
+# every installed copy of the app, so verifying it here closes exactly that
+# gap.
+#
+# minisign is not always installed, and requiring it would turn a safe
+# install into a blocked one. So: verify when it is there, say plainly when
+# it is not. A skipped check that reports itself is a decision; a silent
+# one is not.
+step "Verifying the signature"
+PUBKEY_B64='dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk1NEUwMjBERDg3MDFGMUYKUldRZkgzRFlEUUpPbGY2VzNiendWSXlhbXJDenpnM1BTMDN6NVJBbUZNSXFNQ1lzYkpLeEZGT2gK'
+if command -v minisign >/dev/null 2>&1; then
+  printf '%s' "$PUBKEY_B64" | base64 -d > "$TMP_DIR/quita.pub"
+  if curl -fsSL -o "$TMP_DIR/$ASSET_NAME.sig" "${DOWNLOAD_BASE}/${ASSET_NAME}.sig"; then
+    if minisign -V -q -p "$TMP_DIR/quita.pub" \
+                 -m "$TMP_DIR/$ASSET_NAME" \
+                 -x "$TMP_DIR/$ASSET_NAME.sig"; then
+      info "signed by the release key"
+    else
+      die "the signature does not match - refusing to install"
+    fi
+  else
+    warn "no signature published for this file; only the checksum was checked"
+  fi
+else
+  warn "minisign is not installed, so the signature could not be checked."
+  warn "Install it (brew install minisign / apt install minisign) to verify"
+  warn "the release key rather than only the download."
+fi
+
 if [ "$SKIP_CHECKSUM" != "1" ]; then
   step "Verifying SHA-256"
   EXPECTED="$(curl -fsSL "${DOWNLOAD_BASE}/SHA256SUMS" 2>/dev/null \
