@@ -89,9 +89,26 @@ const touched = FILES.filter(([path, field]) =>
 if (touched.length === 0) {
   console.log(`version ${version} is already set everywhere`);
 } else {
+  const names = FILES.filter(([path, field]) =>
+    path.endsWith('.toml')
+      ? /^\d+\.\d+\.\d+$/.test(version) && !readFileSync(resolve(path), 'utf8').includes(`version = "${version}"`)
+      : JSON.parse(readFileSync(resolve(path), 'utf8'))[field] !== version,
+  ).map(([path]) => path);
   console.log(
-    `${check ? 'would set' : 'set'} version ${version} in ${touched.length} of ${FILES.length} file(s)`,
+    `${check ? 'would set' : 'set'} version ${version} in ${touched.length} of ${FILES.length} file(s): ${names.join(', ')}`,
   );
+
+  // Checking used to only print what it would change and exit 0. The build
+  // workflow called it and read the exit code, so a tag that disagreed with
+  // Cargo.toml or tauri.conf.json built anyway: the updater compares the
+  // version in the binary against the release manifest, and a mismatch does
+  // not fail — the update banner simply never appears.
+  if (check) {
+    console.error(
+      `bump-version: ${names.join(', ')} disagree with the requested version ${version}`,
+    );
+    process.exit(1);
+  }
 }
 
 // The lockfile records the package version too; a stale entry makes

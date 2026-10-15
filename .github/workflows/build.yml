@@ -148,14 +148,50 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           mkdir -p dist
-          gh release download "$TAG" --dir dist --pattern "QuiTa_*"
+          # Two patterns on purpose: the RPM is named `QuiTa-1.2.0-1.x86_64.rpm`
+          # with a hyphen while everything else uses an underscore. A single
+          # `QuiTa_*` silently skipped the RPM, so it reached the release with
+          # no hash at all.
+          gh release download "$TAG" --dir dist \
+            --pattern "QuiTa_*" --pattern "QuiTa-*"
 
       - name: Generate SHA256SUMS
         working-directory: dist
         run: sha256sum * > SHA256SUMS
 
-      # The installer scripts refuse to trust a binary whose hash is missing
-      # from this file, so it must cover every artifact.
+      # The comment below claims the file covers every artifact. That claim is
+      # only worth anything if something checks it: a release that grows a new
+      # bundle, or one renamed to a pattern this job does not match, would
+      # otherwise ship without a hash and nobody would notice until a user
+      # could not verify their download.
+      - name: Verify the checksums cover the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          missing=0
+          while read -r name; do
+            [ -n "$name" ] || continue
+            # The manifest itself and the updater index are not artifacts.
+            case "$name" in
+              SHA256SUMS|latest.json) continue ;;
+            esac
+            if ! grep -q " $name$" dist/SHA256SUMS; then
+              echo "::error::$name is in the release but not in SHA256SUMS"
+              missing=1
+            fi
+          done <<< "$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Every artifact needs a hash; the installer refuses to trust a file without one."
+            exit 1
+          fi
+          echo "Every artifact has a hash in SHA256SUMS."
+
+      # The installer scripts refuse to install a binary whose hash is missing
+      # from this file, so it must cover every artifact. The step above fails
+      # the build when one is not listed, because a release that quietly loses
+      # an installer is exactly the case that is only noticed by a user.
       - name: Upload checksums
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

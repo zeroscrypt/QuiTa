@@ -37,6 +37,12 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Advisories appear over time without anyone touching the code, so the
+      # dependencies have to be re-checked on every run rather than on the days
+      # someone remembers to.
+      - name: Audit dependencies
+        run: pnpm audit --audit-level moderate
+
   rust:
     name: Rust (fmt, clippy, tests)
     runs-on: ubuntu-latest
@@ -67,6 +73,16 @@ jobs:
 
       - name: Tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      # rustls 0.23.45 sat in the lock file with four advisories through months
+      # of green runs: nothing in the code had changed, only the advisory
+      # database. The two ignored entries are build-time crates with no fix
+      # available; both are recorded in docs/DISTRIBUTION.md.
+      - name: Audit dependencies
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ignore: RUSTSEC-2024-0370, RUSTSEC-2024-0429
 
   tauri-build-macos:
     name: Tauri build (macOS Apple Silicon)

@@ -188,7 +188,15 @@ try {
       -OutFile $sumsFile -UseBasicParsing
     $expected = (Select-String -Path $sumsFile -Pattern " $($asset.name)$").Line.Split()[0]
   } catch {
-    Write-Note 'no checksum published for this build - continuing without verification'
+    # Installing without a hash would mean trusting an unverified download,
+    # which is the one thing this script exists to prevent. The opt-out is
+    # an environment variable on purpose: a deliberate act that stays in
+    # the shell history, rather than something a missing file decides.
+    if ($env:QUITA_SKIP_CHECKSUM -eq '1') {
+      Write-Note 'QUITA_SKIP_CHECKSUM is set - installing without verification'
+    } else {
+      throw 'No checksum published for this build - refusing to install. Set QUITA_SKIP_CHECKSUM=1 to install anyway, at your own risk.'
+    }
   }
   if ($expected) {
     $actual = (Get-FileHash -Path $file -Algorithm SHA256).Hash.ToLower()

@@ -1080,9 +1080,17 @@ fn row_to_tab(row: &Row) -> rusqlite::Result<Tab> {
 /// before tabs (migration v2 leaves their `tab_id` NULL) to it, so no task
 /// ever becomes invisible.
 pub fn ensure_default_tab(conn: &Connection) -> Result<Tab, TaskError> {
-    let existing: i64 = conn.query_row("SELECT COUNT(*) FROM tabs", [], |row| row.get(0))?;
+    // Only live tabs count. A deleted one is still a row, and picking it as the
+    // default would put new tasks on a tab the strip does not show.
+    let existing: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM tabs WHERE deleted_at IS NULL",
+        [],
+        |row| row.get(0),
+    )?;
     let tab = if existing > 0 {
-        let mut stmt = conn.prepare("SELECT * FROM tabs ORDER BY sort_order ASC LIMIT 1")?;
+        let mut stmt = conn.prepare(
+            "SELECT * FROM tabs WHERE deleted_at IS NULL ORDER BY sort_order ASC LIMIT 1",
+        )?;
         stmt.query_row([], row_to_tab)?
     } else {
         create_tab(conn, DEFAULT_TAB_NAME)?
@@ -1181,6 +1189,19 @@ pub fn rename_tab(conn: &mut Connection, id: &str, name: &str) -> Result<Tab, Ta
     )?;
     tx.commit()?;
     get_tab(conn, id)
+}
+
+/// Every tab, deleted ones included.
+///
+/// Only the export needs this. Filtering the deleted tabs out of a snapshot
+/// would orphan the tasks that still point at them, and on import there would
+/// be no way to tell that apart from a task that simply arrived without a tab.
+pub fn list_tabs_including_deleted(conn: &Connection) -> Result<Vec<Tab>, TaskError> {
+    let mut stmt = conn.prepare("SELECT * FROM tabs ORDER BY sort_order ASC")?;
+    let tabs = stmt
+        .query_map([], row_to_tab)?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(tabs)
 }
 
 pub fn get_tab(conn: &Connection, id: &str) -> Result<Tab, TaskError> {
@@ -1346,22 +1367,31 @@ pub fn import_tabs(conn: &mut Connection, tabs: &[Tab]) -> Result<(usize, usize)
 
         if exists.is_some() {
             tx.execute(
-                "UPDATE tabs SET name = ?1, color = ?2, sort_order = ?3, updated_at = ?4
-                 WHERE id = ?5",
-                rusqlite::params![name, color, tab.sort_order, now_rfc3339(), tab.id],
+                "UPDATE tabs SET name = ?1, color = ?2, sort_order = ?3, updated_at = ?4,
+                        deleted_at = ?5
+                 WHERE id = ?6",
+                rusqlite::params![
+                    name,
+                    color,
+                    tab.sort_order,
+                    now_rfc3339(),
+                    tab.deleted_at,
+                    tab.id
+                ],
             )?;
             updated += 1;
         } else {
             tx.execute(
-                "INSERT INTO tabs (id, name, color, sort_order, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                "INSERT INTO tabs (id, name, color, sort_order, created_at, updated_at, deleted_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 rusqlite::params![
                     tab.id,
                     name,
                     color,
                     tab.sort_order,
                     tab.created_at,
-                    now_rfc3339()
+                    now_rfc3339(),
+                    tab.deleted_at
                 ],
             )?;
             added += 1;
@@ -1650,7 +1680,13 @@ pub fn db_stats(conn: &Connection) -> Result<DbStats, TaskError> {
         [],
         |row| row.get(0),
     )?;
-    let tab_count: i64 = conn.query_row("SELECT COUNT(*) FROM tabs", [], |row| row.get(0))?;
+    // The label says "Tabs", and the number next to it is what the strip
+    // shows. A tab waiting in the trash with its tasks is neither.
+    let tab_count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM tabs WHERE deleted_at IS NULL",
+        [],
+        |row| row.get(0),
+    )?;
 
     // WAL keeps recent writes in the `-wal` file until a checkpoint, so the
     // real disk footprint is the sum of all three files.

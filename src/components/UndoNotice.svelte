@@ -33,7 +33,9 @@
       <span class="undo-detail">
         {notice.kind === 'flatten'
           ? t('undo.flattenDetail', { count: String(notice.flattenedCount) })
-          : t('undo.tabDetail', { count: String(notice.taskCount) })}
+          : notice.taskCount > 0
+            ? t('undo.tabDetail', { count: String(notice.taskCount) })
+            : t('undo.tabDetailNone')}
       </span>
     </span>
 

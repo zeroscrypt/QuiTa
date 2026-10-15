@@ -191,7 +191,7 @@ src-tauri/src/
 **Миграции:**
 - `db/migrations.rs` — таблица `schema_migrations` с версиями
 - Миграции применяются последовательно при запуске
-- Текущая версия: 4 — `create_tasks_and_settings` (1), `add_tabs` (2), `add_task_comment` (3), `add_task_search_text` (4), `add_tab_deleted_at` (5)
+- Текущая версия: 5 — `create_tasks_and_settings` (1), `add_tabs` (2), `add_task_comment` (3), `add_task_search_text` (4), `add_tab_deleted_at` (5)
 
 **Транзакции:**
 - Все операции записи выполняются в транзакциях
@@ -312,7 +312,9 @@ GitHub из Rust, а не из вебвью, поэтому CSP остаётся
 QuiTa/
 ├── .github/
 │   └── workflows/
-│       └── ci.yml              # CI: lint, тесты, сборка
+  │       ├── ci.yml              # Линт, тесты, сборка, аудит зависимостей
+  │       ├── build.yml           # Сборка установщиков под тег
+  │       └── release.yml         # Версия, changelog, теги, автослияние
 ├── docs/                       # Документация
 ├── src/                        # Фронтенд (Svelte)
 │   ├── components/            # UI
@@ -334,7 +336,8 @@ QuiTa/
 │   │   ├── lib.rs
 │   │   └── main.rs
 │   ├── tests/
-│   │   └── integration_tests.rs
+│   │   ├── integration_tests.rs
+│   │   └── documentation.rs
 │   ├── Cargo.toml
 │   └── tauri.conf.json
 ├── tests/                      # Тесты фронтенда (vitest)

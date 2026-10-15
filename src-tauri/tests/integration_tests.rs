@@ -615,6 +615,55 @@ fn export_contains_all_fields_and_preserves_links() {
     assert_eq!(child_row.parent_id.as_deref(), Some(parent.id.as_str()));
 }
 
+#[test]
+fn the_export_keeps_a_deleted_tab_and_its_tasks() {
+    // A tab deletion keeps the row so its tasks keep a valid reference. An
+    // export that left the deleted tab out would carry task ids that no tab
+    // in the file could hold, and the import would file them under the
+    // first tab instead — losing which tab they came from.
+    let mut conn = open_test_db();
+    let _home = repository::ensure_default_tab(&conn).unwrap();
+    let work = repository::create_tab(&conn, "Работа").unwrap();
+    let kept = repository::create_task(&mut conn, "Остаётся", None, Some(&work.id), true).unwrap();
+    let gone = repository::create_task(&mut conn, "Уходит", None, Some(&work.id), true).unwrap();
+    repository::delete_tab(&mut conn, &work.id).unwrap();
+
+    let exported = repository::list_tabs_including_deleted(&conn).unwrap();
+    assert!(
+        exported
+            .iter()
+            .any(|t| t.id == work.id && t.deleted_at.is_some()),
+        "the deleted tab must be in the snapshot, trash included"
+    );
+    assert!(exported
+        .iter()
+        .any(|t| t.id == kept.tab_id.clone().unwrap() || t.id == _home.id));
+
+    let tasks = repository::export_tasks(&conn).unwrap();
+    assert!(tasks
+        .iter()
+        .any(|t| t.id == gone.id && t.deleted_at.is_some()));
+
+    // Re-importing into an empty database must reproduce the same picture,
+    // not pile the trashed tasks onto the first tab.
+    let mut other = open_test_db();
+    repository::import_tabs(&mut other, &exported).unwrap();
+    repository::import_tasks(&mut other, &tasks).unwrap();
+    let tabs_after = repository::list_tabs_including_deleted(&other).unwrap();
+    assert!(
+        tabs_after
+            .iter()
+            .any(|t| t.id == work.id && t.deleted_at.is_some()),
+        "the tab came back already deleted, so its tasks stay in the trash"
+    );
+    let owner: String = other
+        .query_row("SELECT tab_id FROM tasks WHERE id = ?1", [&gone.id], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert_eq!(owner, work.id, "the task was filed under the wrong tab");
+}
+
 // ---------- Validation unit mirrors ----------
 
 #[test]

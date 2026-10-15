@@ -88,7 +88,11 @@
       <div class="dialog-actions">
         <button class="button secondary" onclick={() => uiStore.cancelDelete()}>{t('delete.cancel')}</button>
         <button class="button danger" bind:this={confirmBtn} disabled={busy} onclick={() => void confirm()}>
-          {busy ? t('delete.working') : t('delete.confirm')}
+          {busy
+            ? t('delete.working')
+            : tabState
+              ? t('delete.tabConfirm')
+              : t('delete.confirm')}
         </button>
       </div>
     </div>

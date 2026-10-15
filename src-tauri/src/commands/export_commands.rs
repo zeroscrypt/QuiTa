@@ -41,7 +41,12 @@ fn build_payload(conn: &rusqlite::Connection) -> Result<ExportPayload, TaskError
         version: EXPORT_FORMAT_VERSION,
         exported_at: Utc::now().to_rfc3339(),
         tasks: repository::export_tasks(conn)?,
-        tabs: Some(repository::list_tabs(conn)?),
+        // Every tab, including the deleted ones. Their tasks sit in the trash
+        // still pointing at them, and `list_tabs` filters those out — so an
+        // export made with it would carry task ids that no tab in the file
+        // could ever hold, and the import would quietly file them under the
+        // first tab instead.
+        tabs: Some(repository::list_tabs_including_deleted(conn)?),
         settings: Some(repository::get_settings(conn)?),
     })
 }

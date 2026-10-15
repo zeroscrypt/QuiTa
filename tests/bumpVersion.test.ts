@@ -89,8 +89,42 @@ describe('bump-version', () => {
     const dir = makeProject('1.0.0');
     try {
       const before = readFileSync(join(dir, 'package.json'), 'utf8');
-      run(dir, '--check', '1.0.1');
+      // The run fails here, and that is the point: the build workflow reads
+      // this exit code to refuse a tag that disagrees with the sources. What
+      // must not happen is the file being rewritten on the way to failing.
+      expect(() => run(dir, '--check', '1.0.1')).toThrow();
       expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(before);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('succeeds in --check mode when the versions already agree', () => {
+    const dir = makeProject('1.0.0');
+    try {
+      expect(run(dir, '--check', '1.0.0')).toContain('already set everywhere');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('names the files that disagree', () => {
+    // "3 of 3 files" is not actionable on a release day; the path is.
+    const dir = makeProject('1.0.0');
+    try {
+      let stderr = '';
+      try {
+        execFileSync('node', [SCRIPT, '--check', '2.0.0'], {
+          cwd: dir,
+          encoding: 'utf8',
+          env: { ...process.env, QUITA_PROJECT_ROOT: dir },
+          stdio: 'pipe',
+        });
+      } catch (error) {
+        stderr = String((error as { stderr?: string }).stderr ?? '');
+      }
+      expect(stderr).toContain('src-tauri/Cargo.toml');
+      expect(stderr).toContain('src-tauri/tauri.conf.json');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

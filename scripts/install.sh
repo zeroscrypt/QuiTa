@@ -216,7 +216,13 @@ if [ "$SKIP_CHECKSUM" != "1" ]; then
   EXPECTED="$(curl -fsSL "${DOWNLOAD_BASE}/SHA256SUMS" 2>/dev/null \
     | grep -F " $ASSET_NAME" | cut -d' ' -f1 | head -n 1 || true)"
   if [ -z "$EXPECTED" ]; then
-    warn "no checksum published for this build — continuing without verification"
+    # Installing without a hash would mean trusting an unverified
+    # download, which is the one thing this script exists to prevent.
+    # The opt-out is an environment variable on purpose: a deliberate
+    # act that stays in the shell history, rather than something a
+    # missing file quietly decides on the user behalf.
+    die "no checksum published for this build - refusing to install
+         QUITA_SKIP_CHECKSUM=1 installs it anyway, at your own risk."
   else
     ACTUAL="$(sha256_of "$TMP_DIR/$ASSET_NAME")"
     [ "$ACTUAL" = "$EXPECTED" ] || die "checksum mismatch — refusing to install"
