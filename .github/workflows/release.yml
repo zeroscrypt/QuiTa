@@ -62,7 +62,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          log-level: debug
 
       - name: Report
         env:
