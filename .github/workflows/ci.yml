@@ -16,6 +16,18 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only by default, as the GitHub security guide asks: "It's good security
+# practice to set the default permission for the GITHUB_TOKEN to read access
+# only for repository contents." Nothing in CI writes to the repository.
+#
+# This matters because CI also runs on pull requests, and the `rust` job
+# compiles the code from that pull request — so build.rs and the test binaries
+# run while the job holds a token. Without this block the token would inherit
+# the repository default, which is `write`. A fork would still get a read-only
+# token, but a branch pushed into the repository itself would not.
+permissions:
+  contents: read
+
 jobs:
   # Decides what is actually worth building.
   #
