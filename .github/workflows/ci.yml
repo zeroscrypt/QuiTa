@@ -237,10 +237,20 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
 
-          $msi = Get-ChildItem "$env:GITHUB_WORKSPACE\src-tauri\target\release\bundle\msi\*.msi" |
+          # Searched for rather than hardcoded. The first version of this test
+          # named `bundle\msi` and failed on a path that was correct when it
+          # was written and stopped being correct by the next Tauri release -
+          # and the failure said only "path not found", with no clue.
+          $bundle = Join-Path $env:GITHUB_WORKSPACE 'src-tauri\target\release\bundle'
+          $msi = Get-ChildItem -Path $bundle -Filter '*.msi' -Recurse -ErrorAction SilentlyContinue |
             Select-Object -First 1
-          if (-not $msi) { throw 'no MSI was produced' }
-          Write-Host "Installing $($msi.Name)"
+          if (-not $msi) {
+            Write-Host "Bundler output tree:"
+            Get-ChildItem -Path $bundle -Recurse -ErrorAction SilentlyContinue |
+              Select-Object -First 30 | ForEach-Object { Write-Host "  $($_.FullName)" }
+            throw 'no MSI was produced'
+          }
+          Write-Host "Installing $($msi.FullName)"
 
           $install = Start-Process msiexec -Wait -PassThru -ArgumentList @(
             '/i', "`"$($msi.FullName)`"", '/quiet', '/norestart'
@@ -288,7 +298,8 @@ jobs:
           Start-Sleep -Seconds 2
           # Uninstalling proves the reverse direction too: an installer that
           # cannot be removed leaves the next run testing a patched machine.
-          $msi = Get-ChildItem "$env:GITHUB_WORKSPACE\src-tauri\target\release\bundle\msi\*.msi" |
+          $msi = Get-ChildItem -Path (Join-Path $env:GITHUB_WORKSPACE 'src-tauri\target\release\bundle') `
+            -Filter '*.msi' -Recurse -ErrorAction SilentlyContinue |
             Select-Object -First 1
           if ($msi) {
             $p = Start-Process msiexec -Wait -PassThru -ArgumentList @('/x', "`"$($msi.FullName)`"", '/quiet')
