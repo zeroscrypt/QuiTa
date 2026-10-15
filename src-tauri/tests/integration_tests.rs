@@ -664,6 +664,81 @@ fn the_export_keeps_a_deleted_tab_and_its_tasks() {
     assert_eq!(owner, work.id, "the task was filed under the wrong tab");
 }
 
+#[test]
+fn an_import_cannot_smuggle_an_oversized_comment() {
+    // The typed path refuses a comment over the limit; the import path used
+    // to write whatever the file carried, so a 64 MB upload could put the
+    // whole thing into one field and break the layout of every card.
+    let mut conn = open_test_db();
+    let tab = repository::ensure_default_tab(&conn).unwrap();
+    let huge = "x".repeat(validation::MAX_COMMENT_CHARS + 500);
+    let task = Task {
+        id: uuid::Uuid::new_v4().to_string(),
+        parent_id: None,
+        tab_id: Some(tab.id.clone()),
+        title: "Задача".to_string(),
+        created_at: "2026-01-01T00:00:00Z".to_string(),
+        updated_at: "2026-01-01T00:00:00Z".to_string(),
+        completed_at: None,
+        deleted_at: None,
+        due_date: None,
+        comment: Some(huge),
+        sort_order: 0,
+        completion_event_id: None,
+        auto_completed_by: None,
+    };
+
+    repository::import_tasks(&mut conn, &[task]).unwrap();
+
+    let stored: Option<String> = conn
+        .query_row(
+            "SELECT comment FROM tasks WHERE title = 'Задача'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    match stored {
+        // Dropping the comment keeps the task, which is the point: an export
+        // that lost whole tasks would read as data loss.
+        None => {}
+        Some(text) => assert!(
+            text.chars().count() <= validation::MAX_COMMENT_CHARS,
+            "the oversized comment reached the database: {} chars",
+            text.chars().count()
+        ),
+    }
+}
+
+#[test]
+fn an_import_keeps_a_comment_inside_the_limit() {
+    let mut conn = open_test_db();
+    let tab = repository::ensure_default_tab(&conn).unwrap();
+    let task = Task {
+        id: uuid::Uuid::new_v4().to_string(),
+        parent_id: None,
+        tab_id: Some(tab.id.clone()),
+        title: "С комментарием".to_string(),
+        created_at: "2026-01-01T00:00:00Z".to_string(),
+        updated_at: "2026-01-01T00:00:00Z".to_string(),
+        completed_at: None,
+        deleted_at: None,
+        due_date: None,
+        comment: Some("короткий".to_string()),
+        sort_order: 0,
+        completion_event_id: None,
+        auto_completed_by: None,
+    };
+    repository::import_tasks(&mut conn, &[task]).unwrap();
+    let stored: Option<String> = conn
+        .query_row(
+            "SELECT comment FROM tasks WHERE title = 'С комментарием'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(stored.as_deref(), Some("короткий"));
+}
+
 // ---------- Validation unit mirrors ----------
 
 #[test]

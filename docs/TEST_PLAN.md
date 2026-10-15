@@ -13,7 +13,7 @@
 | Набор | Команда | Тестов |
 |-------|---------|--------|
 | Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 40 |
-| Rust integration | то же | 84 |
+| Rust integration | то же | 86 |
 | Rust документация | то же (`tests/documentation.rs`) | 3 |
 | TypeScript | `pnpm test` | 119 |
 
@@ -388,7 +388,7 @@ GitHub Actions (`.github/workflows/ci.yml`):
 | Проверка | Команда | Результат |
 |----------|---------|-----------|
 | Тесты UI | `pnpm test` | 119 из 119 пройдено (15 файлов) |
-| Тесты Rust | `cargo test` | 40 unit + 84 интеграционных + 4 на документацию |
+| Тесты Rust | `cargo test` | 40 unit + 86 интеграционных + 4 на документацию |
 
 Более ранний прогон, на котором сняты остальные строки таблицы:
 

@@ -1570,6 +1570,17 @@ pub fn import_tasks(
             skipped += 1;
             continue;
         };
+
+        // The same argument applies to the comment, and the limit was missing
+        // here: it was enforced on the typed path but not on this one, so a
+        // file could hand the UI a field as long as the whole upload limit.
+        // A task whose comment is too long loses the comment rather than the
+        // task — dropping the task would make an export look like data loss.
+        let comment = task.comment.as_deref().and_then(|raw| {
+            let cleaned = raw.trim();
+            (!cleaned.is_empty() && cleaned.chars().count() <= validation::MAX_COMMENT_CHARS)
+                .then(|| cleaned.to_string())
+        });
         let parent_ok = match &task.parent_id {
             Some(pid) => tx
                 .query_row(
@@ -1630,7 +1641,7 @@ pub fn import_tasks(
                     task.completed_at,
                     task.deleted_at,
                     task.due_date,
-                    task.comment,
+                    comment,
                     task.sort_order,
                     task.completion_event_id,
                     task.auto_completed_by,
@@ -1655,7 +1666,7 @@ pub fn import_tasks(
                     task.completed_at,
                     task.deleted_at,
                     task.due_date,
-                    task.comment,
+                    comment,
                     task.sort_order,
                     task.completion_event_id,
                     task.auto_completed_by

@@ -50,6 +50,9 @@ jobs:
     outputs:
       released: ${{ steps.release.outputs.release_created }}
       tag: ${{ steps.release.outputs.tag_name }}
+      # Consumed by the merge job: the pull request to merge is named here, not
+      # looked up by its title, because a title can be forged by anyone.
+      prs: ${{ steps.release.outputs.prs }}
     steps:
       - uses: actions/checkout@v4
 
@@ -106,16 +109,35 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
+          RELEASE_PRS: ${{ needs.release-please.outputs.prs }}
         run: |
           set -euo pipefail
 
-          number="$(gh pr list --repo "$REPO" --base main --state open \
-            --json number,title --jq '.[] | select(.title | startswith("chore(main): release")) | .number' \
-            | head -n 1)"
+          # The number comes from Release Please itself, never from a search by
+          # title. The repository is public, so anyone can open a pull request
+          # called "chore(main): release 9.9.9" and wait; a title search would
+          # find theirs first, because gh lists the newest first, and main
+          # requires neither reviews nor checks.
+          number="$(printf '%s' "$RELEASE_PRS" | jq -r '.[0].number // empty' 2>/dev/null || true)"
           if [ -z "$number" ]; then
-            echo "No release PR is open, so there is nothing to merge."
+            echo "Release Please reported no pull request, so there is nothing to merge."
             exit 0
           fi
+
+          # Belt and braces: the pull request must still be the one Release
+          # Please created, still open, and sitting on the current main.
+          read -r head_branch head_oid state < <(gh pr view "$number" --repo "$REPO" \
+            --json headRefName,headRefOid,state --jq '[.headRefName, .headRefOid, .state] | join(" ")')
+          if [ "$state" != "OPEN" ]; then
+            echo "::notice::Release PR #$number is $state, not open."
+            exit 0
+          fi
+          case "$head_branch" in
+            release-please--*) ;;
+            *)
+              echo "::warning::PR #$number comes from $head_branch, not from Release Please."
+              exit 0 ;;
+          esac
           echo "Release PR #$number, waiting for CI on $SHA"
 
           # GitHub reports a run that is still going as an empty string rather
