@@ -8,6 +8,7 @@
   import SubtaskList from './SubtaskList.svelte';
   import AutoDeleteDaysPopover from './AutoDeleteDaysPopover.svelte';
   import { taskStore } from '$stores/taskStore.svelte';
+  import { appStore } from '$stores/appStore.svelte';
   import { dragStore } from '$stores/dragStore.svelte';
   import { t } from '$i18n';
   import { fill } from '$lib/text';
@@ -409,7 +410,7 @@
           cancelSubtask();
         }
       }}
-      maxlength="500"
+      maxlength={appStore.limit.title}
     />
   </form>
   <p class="add-subtask-hint">{t('add.subtaskStormHint')}</p>

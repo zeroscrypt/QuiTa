@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { t } from '$i18n';
+  import { appStore } from '$stores/appStore.svelte';
 
   let {
     value,
@@ -103,7 +104,7 @@
       placeholder={t('comment.placeholder')}
       aria-label={t('comment.label')}
       rows="4"
-      maxlength="2000"
+      maxlength={appStore.limit.comment}
     ></textarea>
     <p class="comment-hint">{t('comment.autosave')}</p>
   {:else}

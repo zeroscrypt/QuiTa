@@ -2,6 +2,7 @@
   import { t } from '$i18n';
   import { onMount } from 'svelte';
   import { taskStore } from '$stores/taskStore.svelte';
+  import { appStore } from '$stores/appStore.svelte';
   import { normalizeTitle } from '$domain/taskValidation';
   import { onEnter } from '$lib/capture';
 
@@ -69,7 +70,7 @@
     placeholder={t('add.placeholder')}
     aria-label={t('add.label')}
     aria-invalid={error !== null}
-    maxlength="500"
+    maxlength={appStore.limit.title}
   />
 </form>
 {#if error}

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { getAppInfo, type AppInfo } from '$services/appService';
+  import { appStore } from '$stores/appStore.svelte';
   import { getLanguage, t } from '$i18n';
   import { settingsStore } from '$stores/settingsStore.svelte';
   import { updateStore } from '$stores/updateStore.svelte';
@@ -8,15 +8,11 @@
 
   let { onClose }: { onClose: () => void } = $props();
 
-  let info = $state<AppInfo | null>(null);
+  const info = $derived(appStore.info);
   const ru = $derived(getLanguage() === 'ru');
 
-  onMount(async () => {
-    try {
-      info = await getAppInfo();
-    } catch {
-      info = null;
-    }
+  onMount(() => {
+    void appStore.load();
   });
 
   function onBackdropClick(event: MouseEvent) {

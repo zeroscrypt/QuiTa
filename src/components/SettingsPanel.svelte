@@ -6,6 +6,7 @@
   import { taskStore } from '$stores/taskStore.svelte';
   import { tabStore } from '$stores/tabStore.svelte';
   import { dbStore } from '$stores/dbStore.svelte';
+  import { appStore } from '$stores/appStore.svelte';
   import type { Task } from '$lib/types';
   import { t } from '$i18n';
   import { fill } from '$lib/text';
@@ -30,6 +31,7 @@
   onMount(() => {
     void taskStore.loadDeleted();
     void dbStore.refresh();
+    void appStore.load();
     function onKeydown(event: KeyboardEvent) {
       if (event.key === 'Escape') uiStore.settingsOpen = false;
     }
@@ -39,6 +41,7 @@
 
   const deleted = $derived(taskStore.deleted);
   const autoDeleteDays = $derived(settingsStore.autoDeleteDays);
+  const shortcutLabel = $derived(appStore.info?.shortcut ?? '');
 
   /** Days left before the task is removed by the retention policy. */
   function daysLeft(task: { deletedAt: string | null }): number | null {
@@ -356,7 +359,11 @@
             <InfoHint text={t('settings.hintShortcut')} />
           </h3>
           <p class="settings-hint">
-            <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Q</kbd> — {t('settings.shortcutHint')}
+            <!-- The combination comes from the backend, which is where it is
+                 actually registered. Writing "Cmd+Shift+Q" into the markup
+                 showed macOS keys on a Windows keyboard, where no such
+                 combination exists. -->
+            <kbd>{shortcutLabel}</kbd> — {t('settings.shortcutHint')}
           </p>
         </section>
       {/if}

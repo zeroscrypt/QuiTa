@@ -8,6 +8,16 @@ export interface AppInfo {
   author: string;
   license: string;
   repository: string;
+  /** Global shortcut as registered on this platform. */
+  shortcut: string;
+  /** Field lengths the database accepts, in characters. */
+  limits: Limits;
+}
+
+export interface Limits {
+  title: number;
+  tabName: number;
+  comment: number;
 }
 
 /** Always up-to-date product metadata (version comes from Cargo). */

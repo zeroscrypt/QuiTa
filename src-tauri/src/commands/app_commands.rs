@@ -65,6 +65,23 @@ pub struct AppInfo {
     pub author: &'static str,
     pub license: &'static str,
     pub repository: &'static str,
+    /// Global shortcut as it is registered on this machine, e.g. "⌘⇧Q" or
+    /// "Win+Alt+Q". Read from the same place that registers it, so the settings
+    /// cannot claim a combination the app does not actually use.
+    pub shortcut: &'static str,
+    /// Input limits enforced by the repository. The UI takes them from here
+    /// rather than repeating the numbers: two hand-kept copies drift apart, and
+    /// the input then stops accepting what the database would have stored.
+    pub limits: Limits,
+}
+
+/// Field lengths the database accepts, in characters.
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Limits {
+    pub title: usize,
+    pub tab_name: usize,
+    pub comment: usize,
 }
 
 #[tauri::command]
@@ -77,6 +94,12 @@ pub fn get_app_info() -> AppInfo {
         author: "@zeroscrypt",
         license: "MIT",
         repository: "https://github.com/zeroscrypt/QuiTa",
+        shortcut: crate::platform::shortcuts::shortcut_label(std::env::consts::OS),
+        limits: Limits {
+            title: crate::domain::validation::MAX_TITLE_CHARS,
+            tab_name: crate::domain::validation::MAX_TAB_NAME_CHARS,
+            comment: crate::domain::validation::MAX_COMMENT_CHARS,
+        },
     }
 }
 

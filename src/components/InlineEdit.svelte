@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { normalizeTitle } from '$domain/taskValidation';
+  import { appStore } from '$stores/appStore.svelte';
 
   let {
     value,
@@ -45,7 +46,7 @@
   class="inline-edit"
   bind:value={current}
   aria-label={ariaLabel}
-  maxlength="500"
+  maxlength={appStore.limit.title}
   onkeydown={onKeydown}
   onblur={onCancel}
 />

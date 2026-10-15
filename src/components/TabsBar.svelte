@@ -2,6 +2,7 @@
   import { tick, untrack } from 'svelte';
   import ContextMenu from './ContextMenu.svelte';
   import { tabStore } from '$stores/tabStore.svelte';
+  import { appStore } from '$stores/appStore.svelte';
   import { dragStore } from '$stores/dragStore.svelte';
   import { settingsStore } from '$stores/settingsStore.svelte';
   import type { Item } from '$lib/menuTypes';
@@ -326,7 +327,7 @@
             class="tab-input"
             bind:value={draft}
             aria-label={t('tab.nameLabel')}
-            maxlength="40"
+            maxlength={appStore.limit.tabName}
             onkeydown={(e) => {
               if (e.key === 'Enter') void commit();
               if (e.key === 'Escape') editing = null;
@@ -377,7 +378,7 @@
           bind:value={draft}
           placeholder={t('tab.new')}
           aria-label={t('tab.nameLabel')}
-          maxlength="40"
+          maxlength={appStore.limit.tabName}
           onkeydown={(e) => {
             if (e.key === 'Enter') void commit();
             if (e.key === 'Escape') editing = null;

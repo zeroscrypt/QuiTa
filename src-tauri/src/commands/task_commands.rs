@@ -1,3 +1,10 @@
+/// How many deleted tasks the recycle bin shows in one go.
+///
+/// It is a bound, not a feature: the bin is a list a person scans, and a
+/// repository with tens of thousands of deleted rows should not try to render
+/// all of them at once.
+const TRASH_PAGE_SIZE: i64 = 200;
+
 use tauri::State;
 
 use crate::db::{repository, Db};
@@ -141,7 +148,7 @@ pub async fn list_deleted_tasks(
     db: State<'_, Db>,
 ) -> Result<Vec<crate::domain::task::Task>, TaskError> {
     let conn = db.lock().map_err(TaskError::Internal)?;
-    repository::list_deleted_all(&conn, 200)
+    repository::list_deleted_all(&conn, TRASH_PAGE_SIZE)
 }
 
 #[tauri::command]

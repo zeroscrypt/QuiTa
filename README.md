@@ -2,9 +2,10 @@
 
 # QuiTa
 
-### A task manager that lives in the tray.
+**Quick Tasks App**
+A task manager that lives in the tray.
 
-**Captured a thought in a second — back to work.**
+Captured a thought in a second — back to work.
 
 [![CI](https://github.com/zeroscrypt/QuiTa/actions/workflows/ci.yml/badge.svg)](https://github.com/zeroscrypt/QuiTa/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/zeroscrypt/QuiTa?label=release&logo=github&style=flat-square&labelColor=1f2430)](https://github.com/zeroscrypt/QuiTa/releases/latest)
@@ -21,15 +22,11 @@ English · **[Русский](README.ru.md)**
 
 ---
 
-> **Quick Tasks App — QuiTa**
->
-> | | | | | | | |
-> |---|---|---|---|---|---|---|
-> | [🔵 What this is](#-what-this-is) | [🟢 Install](#-install) | [🟡 Features](#-features) | [🟠 How it works](#-how-it-works) | [🔴 Data](#-data) | [⚪ Development](#-development) | [⚫ Project](#-project) |
+> [What this is](#what-this-is) · [Install](#install) · [Features](#features) · [How it works](#how-it-works) · [Data](#data) · [Development](#development) · [Project](#project)
 
 ---
 
-## 🔵 What this is
+## What this is
 
 Every task manager offers **planning**. QuiTa offers **capture**.
 
@@ -61,7 +58,7 @@ disk.
 
 ---
 
-## 🟢 Install
+## Install
 
 - [x] **Ready build, one command** — macOS and Linux
 - [x] **Ready build, one command** — Windows
@@ -117,7 +114,7 @@ Windows, `.AppImage` + `.deb` on Linux.
 
 ---
 
-## 🟡 Features
+## Features
 
 - [x] **Tabs as projects** — create, rename by double click, reorder by drag, automatic colour from a 10-colour palette. Deleting a tab moves its tasks to a neighbour: data loss is impossible.
 - [x] **Subtasks** — exactly one level of nesting, and no more is possible.
@@ -130,7 +127,7 @@ Windows, `.AppImage` + `.deb` on Linux.
 - [x] **Dark and light theme** — follows the system or pinned manually.
 - [x] **Русский and English** — switched in settings, applied immediately.
 - [x] **Lives in the tray** — closing the window hides the app instead of quitting.
-- [x] **Hotkey** — `⌘⇧Q` opens the window with the caret in the input.
+- [x] **Hotkey** — `⌘⇧Q` on macOS, `Win+Alt+Q` on Windows and Linux, opens the window with the caret in the input.
 - [x] **Export and import** — a snapshot of the whole app as JSON.
 - [x] **In-app updates** — a green strip above the tabs: "Version 1.1.4 is available".
 - [x] **Resizable window** — double-click the logo to fill the height and widen by 1.6×.
@@ -147,7 +144,7 @@ Each of these is a reason to stop being a buffer.
 
 ---
 
-## 🟠 How it works
+## How it works
 
 ### Storm
 
@@ -185,7 +182,7 @@ root task and the subtask field behaves identically.
 
 ---
 
-## 🔴 Data
+## Data
 
 - [x] **One SQLite file on the device.**
 - [x] **No network connection at all** — except the update check.
@@ -218,7 +215,7 @@ could break. Version 1 files import as-is.
 
 ---
 
-## ⚪ Development
+## Development
 
 ### Stack
 
@@ -259,11 +256,11 @@ therefore testable without a window.
 | App size | 17.6 MB |
 | `.dmg` size | 5.8 MB |
 | Database | ≈210 bytes per task |
-| Query time | 1–3 ms |
+| Query time | 1–3 ms 
 
 ---
 
-## ⚫ Project
+## Project
 
 ### Documentation
 

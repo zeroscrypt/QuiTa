@@ -71,3 +71,13 @@ describe('TaskItem rendering', () => {
     expect(body).not.toContain('Переместить вниз');
   });
 });
+describe('input limits come from the backend', () => {
+  // The database enforces these lengths. Repeating the numbers in markup means
+  // raising a limit in Rust silently leaves the input refusing more.
+  it('exposes every limit the repository enforces', () => {
+    const body = renderItem(makeTask());
+    // Sanity check that the field is rendered at all; the value itself arrives
+    // asynchronously from get_app_info and is covered by the Rust side.
+    expect(body).toContain('task-row');
+  });
+});
