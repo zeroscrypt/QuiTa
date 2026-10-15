@@ -112,12 +112,24 @@ describe('bump-version', () => {
     }
   });
 
-  it('refuses anything that is not a plain X.Y.Z', () => {
+  it('finds the number behind any tag prefix', () => {
+    // Tags created before include-component-in-tag was turned off look like
+    // `QuiTa-v1.0.1`; a script that cannot read those cannot verify them.
     const dir = makeProject('1.0.0');
     try {
-      expect(() => run(dir, '1.0')).toThrow();
-      expect(() => run(dir, 'v1.0.0-rc.1')).toThrow();
+      run(dir, 'QuiTa-v1.0.1');
+      expect(readVersion(dir)).toEqual({ package: '1.0.1', tauri: '1.0.1', cargo: '1.0.1' });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses anything without a version in it', () => {
+    const dir = makeProject('1.0.0');
+    try {
       expect(() => run(dir, 'latest')).toThrow();
+      expect(() => run(dir, '1.0')).toThrow();
+      expect(() => run(dir, '')).toThrow();
       expect(readVersion(dir)).toEqual({ package: '1.0.0', tauri: '1.0.0', cargo: '1.0.0' });
     } finally {
       rmSync(dir, { recursive: true, force: true });

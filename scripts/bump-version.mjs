@@ -40,10 +40,12 @@ function parseArgs(argv) {
   const check = argv.includes('--check');
   const raw = argv.find((arg) => !arg.startsWith('--'));
   if (!raw) fail('a version is required, e.g. 1.0.1');
-  // A tag arrives as `v1.0.1`; accepting both keeps callers from having to
-  // strip the prefix in a shell, where quoting is easy to get wrong.
-  const version = raw.startsWith('v') ? raw.slice(1) : raw;
-  if (!SEMVER.test(version)) fail(`"${raw}" is not a plain X.Y.Z version`);
+  // A tag may arrive as `v1.0.1`, as a bare `1.0.1`, or — from tags created
+  // before include-component-in-tag was turned off — as `QuiTa-v1.0.1`.
+  // Taking the number out with a pattern keeps callers from having to strip
+  // anything, and shell quoting is where that kind of thing usually breaks.
+  const version = /\d+\.\d+\.\d+/.exec(raw)?.[0] ?? raw;
+  if (!SEMVER.test(version)) fail(`"${raw}" contains no X.Y.Z version`);
   return { version, check };
 }
 

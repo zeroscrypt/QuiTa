@@ -84,7 +84,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          expected="${TAG#v}"
+          # The number is taken with a pattern rather than by stripping a "v"
+          # prefix: tags produced before include-component-in-tag was turned
+          # off are named like `QuiTa-v1.1.0`, and both must build.
+          expected="$(printf '%s' "$TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)"
+          if [ -z "$expected" ]; then
+            echo "::error::Cannot find a version in the tag '$TAG'."
+            exit 1
+          fi
           found="$(node -p "require('./package.json').version")"
           if [ "$found" != "$expected" ]; then
             echo "::error::The checkout says $found but the tag says $expected."
