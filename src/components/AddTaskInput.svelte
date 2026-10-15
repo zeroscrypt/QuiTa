@@ -38,16 +38,20 @@
     error = null;
     const normalized = normalizeTitle(action.title);
     title = '';
-    try {
-      await taskStore.addRoot(normalized ?? action.title);
-    } catch (e) {
-      // Keep the entered text so the user can retry without retyping.
+    // addRoot reports failure by returning false and raising a toast — it never
+    // throws. The catch below therefore never ran, so the text cleared before
+    // the request was simply gone when the request failed, which is the one
+    // thing a storm-typing user cannot afford to lose.
+    const added = await taskStore.addRoot(normalized ?? action.title);
+    if (!added) {
+      // The reason is in taskStore.error, where the toast already came from;
+      // showing it next to the field as well is what makes it clear that the
+      // text is still there and waiting.
       title = action.title;
-      error = e instanceof Error ? e.message : String(e);
-    } finally {
-      submitting = false;
-      inputEl?.focus();
+      error = taskStore.error;
     }
+    submitting = false;
+    inputEl?.focus();
   }
 
   /** Escape empties the field: the storm stops, the input stays where it is. */

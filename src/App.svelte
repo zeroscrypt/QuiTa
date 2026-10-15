@@ -152,6 +152,9 @@
     {#if taskStore.error}
       <div class="toast error" role="alert">{taskStore.error}</div>
     {/if}
+    {#if tabStore.error}
+      <div class="toast error" role="alert">{tabStore.error}</div>
+    {/if}
     {#if uiStore.exportMessage}
       <div class="toast" role="status">{uiStore.exportMessage}</div>
     {/if}

@@ -193,41 +193,49 @@ class TaskStore {
   }
 
   async toggle(id: TaskId): Promise<void> {
-    // A toggle may complete/reopen a parent and its children at once, and may
-    // bring tasks back into the visible list. Updating the returned rows in
-    // place keeps the DOM (and the scroll position) stable instead of a full
-    // reload that would jump back to the top of the list.
-    const outcome = await taskService.toggleTaskCompletion(id, settingsStore.cascadeComplete);
+    try {
+      // A toggle may complete/reopen a parent and its children at once, and may
+      // bring tasks back into the visible list. Updating the returned rows in
+      // place keeps the DOM (and the scroll position) stable instead of a full
+      // reload that would jump back to the top of the list.
+      const outcome = await taskService.toggleTaskCompletion(id, settingsStore.cascadeComplete);
 
-    const known = new Set<string>();
-    for (const node of this.nodes) {
-      known.add(node.task.id);
-      for (const child of node.children) known.add(child.id);
-    }
-    // A reopened parent may not be in the list yet — fetch its children.
-    const missingRoots = outcome.updated.filter(
-      (t) => t.parentId === null && !known.has(t.id),
-    );
+      const known = new Set<string>();
+      for (const node of this.nodes) {
+        known.add(node.task.id);
+        for (const child of node.children) known.add(child.id);
+      }
+      // A reopened parent may not be in the list yet — fetch its children.
+      const missingRoots = outcome.updated.filter(
+        (t) => t.parentId === null && !known.has(t.id),
+      );
 
-    this.applyUpdated(outcome.updated);
+      this.applyUpdated(outcome.updated);
 
-    if (missingRoots.length > 0) {
-      for (const task of missingRoots) {
-        if (task.deletedAt === null && (settingsStore.showCompleted || task.completedAt === null)) {
-          let children: Task[] = [];
-          try {
-            children = await taskService.listSubtasks(task.id);
-          } catch {
-            children = [];
+      if (missingRoots.length > 0) {
+        for (const task of missingRoots) {
+          if (task.deletedAt === null && (settingsStore.showCompleted || task.completedAt === null)) {
+            let children: Task[] = [];
+            try {
+              children = await taskService.listSubtasks(task.id);
+            } catch {
+              children = [];
+            }
+            this.nodes = [...this.nodes, { task, children }].sort(
+              (a, b) => a.task.sortOrder - b.task.sortOrder,
+            );
           }
-          this.nodes = [...this.nodes, { task, children }].sort(
-            (a, b) => a.task.sortOrder - b.task.sortOrder,
-          );
         }
       }
+      // Completing or reopening changes the done/total badge of the tab.
+      this.touchTabCounts();
+    } catch (e) {
+      // This is the action taken on every single click, and it was the one
+      // left without a handler: a rejected call became an unhandled promise,
+      // and the checkbox sprang back with nothing on screen to explain it.
+      this.showError(e);
+      await this.load();
     }
-    // Completing or reopening changes the done/total badge of the tab.
-    this.touchTabCounts();
   }
 
   async setDueDate(id: TaskId, dueDate: string | null): Promise<void> {
@@ -459,7 +467,7 @@ toggleExpanded(id: TaskId): void {
       .filter((node) => showCompleted || node.task.completedAt === null);
   }
 
-  private showError(e: unknown): void {
+  showError(e: unknown): void {
     const message = e instanceof Error ? e.message : String(e);
     this.error = message;
     if (this.errorTimer) clearTimeout(this.errorTimer);

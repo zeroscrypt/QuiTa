@@ -4,6 +4,9 @@ import * as tabService from "$services/tabService";
 class TabStore {
   tabs = $state<Tab[]>([]);
   activeTabId = $state<TaskId | null>(null);
+  /** Shown as a toast; the tab strip has no other place to put a message. */
+  error = $state<string | null>(null);
+
   /** Tab being renamed (double click) or created. */
   editingTabId = $state<TaskId | "new" | null>(null);
   /** done/total per tab, refreshed after every list load. */

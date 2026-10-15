@@ -162,13 +162,20 @@ class UiStore {
   async undo(): Promise<boolean> {
     const pending = this.pendingUndo;
     if (!pending) return false;
-    this.clearUndo();
-    if (pending.kind === "flatten") {
-      await taskService.undoNest(pending.receipt);
-      await taskStore.load();
-      return true;
+    // Cleared only once the undo actually went through. Doing it first meant a
+    // failed call left the user with no way back and no explanation: the notice
+    // was gone and the nesting had become permanent.
+    try {
+      if (pending.kind === "flatten") {
+        await taskService.undoNest(pending.receipt);
+      } else {
+        await tabStore.restore(pending.deletion);
+      }
+    } catch (e) {
+      taskStore.showError(e);
+      return false;
     }
-    await tabStore.restore(pending.deletion);
+    this.clearUndo();
     await taskStore.load();
     return true;
   }
