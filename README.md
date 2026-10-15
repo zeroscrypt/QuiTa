@@ -82,6 +82,10 @@ before the check passes.
 irm https://raw.githubusercontent.com/zeroscrypt/QuiTa/main/scripts/install.ps1 | iex
 ```
 
+Run it from PowerShell **as administrator** — the installer is machine-wide,
+and without the rights Windows refuses it silently, with exit code `1603`.
+The script checks for that up front and says so when the rights are missing.
+
 ### Download manually
 
 [**Releases**](https://github.com/zeroscrypt/QuiTa/releases/latest) → pick the

@@ -121,6 +121,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The installer script is what users run first, and a syntax error in it
+      # is invisible until someone copies a command from the README.
+      - name: Parse install.ps1
+        shell: pwsh
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'scripts/install.ps1'), [ref]$null, [ref]$errors) | Out-Null
+          if ($errors) {
+            $errors | ForEach-Object { Write-Error "$($_.Extent.StartLineNumber): $($_.Message)" }
+            exit 1
+          }
+          Write-Host 'install.ps1 parses cleanly'
+
       - name: Build app
         run: pnpm tauri build
 
@@ -153,6 +167,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # The installer script is what users run first, and a syntax error in it
+      # is invisible until someone copies a command from the README. Checked
+      # here rather than on macOS, whose bash is still 3.2.
+      - name: Parse install.sh
+        run: bash -n scripts/install.sh && echo 'install.sh parses cleanly'
 
       - name: Build app
         run: pnpm tauri build

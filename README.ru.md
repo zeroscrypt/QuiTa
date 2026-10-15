@@ -82,6 +82,10 @@ SHA-256 с опубликованной суммой и только потом 
 irm https://raw.githubusercontent.com/zeroscrypt/QuiTa/main/scripts/install.ps1 | iex
 ```
 
+Запускать в PowerShell **от имени администратора** — установщик ставится для
+всех пользователей, и без прав Windows отказывает молча, кодом `1603`.
+Скрипт проверяет это заранее и говорит, если прав не хватает.
+
 ### Скачать вручную
 
 [**Releases**](https://github.com/zeroscrypt/QuiTa/releases/latest) →

@@ -91,7 +91,79 @@ fi
 VERSION="${TAG#v}"
 info "$TAG"
 
+# Installed version, when there is one. Reading it before the download keeps
+# an up-to-date machine from re-fetching and reinstalling the same build.
+installed_version() {
+  local dir
+  if [ "$PLATFORM" = "macos" ]; then
+    dir="${INSTALL_DIR:-}"
+    [ -n "$dir" ] || dir="$HOME/Applications"
+    [ -d "$dir/$BUNDLE_ID" ] || return 0
+    # Info.plist holds the version the build was made with.
+    defaults read "$dir/$BUNDLE_ID/Contents/Info" CFBundleShortVersionString 2>/dev/null || true
+  else
+    dir="${INSTALL_DIR:-$HOME/.local/opt/quita}"
+    # The AppImage is installed under a fixed name, so its version is not in
+    # the file name; this script writes it next to it instead.
+    [ -f "$dir/.version" ] && cat "$dir/.version"
+  fi
+  return 0
+}
+
+# QuiTa sits in the tray, so a closed window does not mean a stopped app.
+# Replacing a running bundle leaves the old copy running from unlinked files,
+# and the next launch then runs stale code that no longer matches the disk.
+app_is_running() {
+  local dir
+  if [ "$PLATFORM" = "macos" ]; then
+    dir="${INSTALL_DIR:-}"
+    [ -n "$dir" ] || dir="$HOME/Applications"
+    pgrep -f "${dir}/${BUNDLE_ID}/Contents/MacOS/" >/dev/null 2>&1
+  else
+    dir="${INSTALL_DIR:-$HOME/.local/opt/quita}"
+    pgrep -f "${dir}/QuiTa.AppImage" >/dev/null 2>&1
+  fi
+}
+
 DOWNLOAD_BASE="https://github.com/$REPO/releases/download/$TAG"
+
+# ------------------------------------------------------- what is installed ----
+# Checked before anything is downloaded. Reinstalling the version that is
+# already there fetches and rewrites for nothing, and replacing a running app
+# leaves the old code running from files the new install has unlinked.
+is_numeric_version() {
+  case "$1" in
+    *[!0-9.]* | '') return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+# True when $1 is strictly newer than $2. Only meaningful for plain X.Y.Z,
+# which the caller guards. The inequality matters: sorting two equal versions
+# puts either one first, so without it equal versions would count as newer.
+version_gt() {
+  [ "$1" != "$2" ] &&
+    [ "$(printf '%s\n%s\n' "$2" "$1" | sort -t. -k1,1n -k2,2n -k3,3n | head -n 1)" = "$2" ]
+}
+
+CURRENT="$(installed_version || true)"
+if [ -n "$CURRENT" ]; then
+  info "already installed: $CURRENT"
+  if [ "$CURRENT" = "$VERSION" ]; then
+    printf '\n%s%s %s is already installed - nothing to do.%s\n\n' \
+      "$BOLD" "$APP_NAME" "$CURRENT" "$RESET"
+    exit 0
+  fi
+  if is_numeric_version "$CURRENT" && is_numeric_version "$VERSION" &&
+     version_gt "$CURRENT" "$VERSION"; then
+    die "installed $CURRENT is newer than $VERSION - refusing to downgrade"
+  fi
+  if app_is_running; then
+    # The window can be closed while the tray icon keeps the app alive.
+    warn "QuiTa $CURRENT is still running"
+    die "quit it from the tray icon, then run this again"
+  fi
+fi
 
 # ------------------------------------------------------------------- assets ----
 
@@ -178,6 +250,9 @@ else
   step "Installing into $INSTALL_DIR"
   mkdir -p "$INSTALL_DIR" "$HOME/.local/bin"
   install -m 0755 "$TMP_DIR/$ASSET_NAME" "${INSTALL_DIR}/${APP_NAME}.AppImage"
+  # The AppImage has a fixed name, so the version is recorded next to it for
+  # the "already installed" check on the next run.
+  printf '%s\n' "$VERSION" > "${INSTALL_DIR}/.version"
   ln -sf "${INSTALL_DIR}/${APP_NAME}.AppImage" "$HOME/.local/bin/quita"
   step "Done"
   info "run: quita   (make sure ~/.local/bin is in your PATH)"
