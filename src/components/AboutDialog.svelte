@@ -95,10 +95,33 @@
       <button class="button secondary" onclick={onClose}>{t('about.close')}</button>
     </div>
 
+    <!-- The update action lives here as well as on the green strip. The strip
+         sits behind this dialog's backdrop, so from here it cannot be clicked:
+         the check found a release and the only visible way to act on it has to
+         be inside the dialog. -->
     {#if updateStore.state === 'available' && updateStore.info}
-      <p class="about-update">
-        {t('update.available', { version: updateStore.info.version })}
-      </p>
+      <div class="about-update">
+        <span>{t('update.available', { version: updateStore.info.version })}</span>
+        <button class="about-update-action" onclick={() => void updateStore.update()}>
+          {t('update.action')}
+        </button>
+      </div>
+    {:else if updateStore.state === 'downloading'}
+      <div class="about-update">
+        <span>
+          {t('update.downloading')}
+          {#if updateStore.percent !== null}
+            {updateStore.percent}%
+          {/if}
+        </span>
+      </div>
+    {:else if updateStore.state === 'error'}
+      <div class="about-update error">
+        <span>{t('update.failed')}</span>
+        <button class="about-update-action" onclick={() => void updateStore.update()}>
+          {t('update.retry')}
+        </button>
+      </div>
     {/if}
   </div>
 </div>
@@ -155,12 +178,36 @@
   }
 
   .about-update {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
     margin: 10px 0 0;
     padding: 7px 10px;
     border-radius: 8px;
     background: var(--accent-soft);
     border: 1px solid var(--accent);
     font-size: 12.5px;
-    text-align: center;
+  }
+
+  .about-update.error {
+    background: var(--danger-soft);
+    border-color: var(--danger);
+  }
+
+  .about-update-action {
+    flex: none;
+    padding: 3px 10px;
+    border: none;
+    border-radius: 6px;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .about-update-action:hover {
+    filter: brightness(1.08);
   }
 </style>

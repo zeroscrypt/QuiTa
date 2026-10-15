@@ -212,5 +212,7 @@ export const ru: Record<string, string> = {
   'update.later': 'Позже',
   'update.downloading': 'Загрузка обновления',
   'update.failed': 'Не удалось',
-  'update.check': 'Проверить обновления',  'update.checking': 'Проверка…',
+  'update.retry': 'Повторить',
+  'update.check': 'Проверить обновления',
+  'update.checking': 'Проверка…',
 };

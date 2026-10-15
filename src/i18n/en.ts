@@ -213,5 +213,7 @@ export const en: Record<string, string> = {
   'update.later': 'Later',
   'update.downloading': 'Downloading update',
   'update.failed': 'Failed',
-  'update.check': 'Check for updates',  'update.checking': 'Checking…',
+  'update.retry': 'Try again',
+  'update.check': 'Check for updates',
+  'update.checking': 'Checking…',
 };
