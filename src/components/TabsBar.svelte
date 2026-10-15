@@ -14,6 +14,7 @@
   let draft = $state('');
   let inputEl = $state<HTMLInputElement | undefined>(undefined);
   let menuAnchor = $state<DOMRect | null>(null);
+  let menuByKeyboard = $state(false);
   let menuTabId = $state<string | null>(null);
   let stripEl = $state<HTMLElement | undefined>(undefined);
   /** Edge fades, shown only when there is more to scroll towards. */
@@ -129,6 +130,7 @@
     event.preventDefault();
     menuTabId = tabId;
     menuAnchor = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    menuByKeyboard = false;
   }
 
   // --- Drag & drop to reorder tabs -------------------------------------------
@@ -165,7 +167,24 @@
    * ends. Only the selected tab is in the tab order (roving tabindex), so Tab
    * leaves the strip in a single step.
    */
+  /**
+ * Renaming or deleting a tab was reachable only by mouse: the menu opened on
+ * right click, and on double click alone. Shift+F10 and the dedicated
+ * context-menu key open the same menu for anyone not using a mouse.
+ */
+function openMenuByKeyboard(event: KeyboardEvent, tabId: string): boolean {
+    const wanted = event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey);
+    if (!wanted) return false;
+    event.preventDefault();
+    menuTabId = tabId;
+    menuAnchor = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    menuByKeyboard = true;
+    return true;
+  }
+
   function onTabKeydown(event: KeyboardEvent, index: number) {
+    const tab = tabs[index];
+    if (tab && openMenuByKeyboard(event, tab.id)) return;
     const last = tabs.length - 1;
     let next = index;
     switch (event.key) {
@@ -425,6 +444,7 @@
   <ContextMenu
     items={menuItems}
     anchor={menuAnchor}
+    openedByKeyboard={menuByKeyboard}
     label={t('tab.menuLabel')}
     onClose={() => (menuAnchor = null)}
   />

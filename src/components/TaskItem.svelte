@@ -30,6 +30,7 @@
 
   let editing = $state(false);
   let menuOpen = $state(false);
+  let menuByKeyboard = $state(false);
   let menuAnchor = $state<DOMRect | null>(null);
   let duePickerOpen = $state(false);
   let dueAnchor = $state<DOMRect | null>(null);
@@ -67,6 +68,23 @@
   function openRowMenu(event: MouseEvent) {
     event.preventDefault();
     menuAnchor = anchorFrom(event);
+    menuByKeyboard = false;
+    menuOpen = true;
+  }
+
+  /**
+   * Shift+F10 and the dedicated context-menu key open the same menu. Without
+   * this the whole menu — including delete and reorder — was reachable only
+   * with a mouse.
+   */
+  function openRowMenuByKeyboard(event: KeyboardEvent) {
+    if (event.key !== 'F10' && event.key !== 'ContextMenu') return;
+    if (event.shiftKey === false && event.key === 'F10') return;
+    if (event.key === 'ContextMenu' && !event.shiftKey) return;
+    event.preventDefault();
+    const row = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    menuAnchor = new DOMRect(row.right, row.bottom, 0, 0);
+    menuByKeyboard = true;
     menuOpen = true;
   }
 
@@ -231,6 +249,7 @@
   data-task-row={isSubtask ? undefined : task.id}
   data-drop-parent={canAdopt ? task.id : undefined}
   oncontextmenu={openRowMenu}
+  onkeydown={openRowMenuByKeyboard}
   onpointerdown={onRowPointerDown}
 >
   <div class="task-lead">
@@ -366,6 +385,7 @@
     items={menuItems}
     anchor={menuAnchor}
     label={t('task.menuLabel')}
+    openedByKeyboard={menuByKeyboard}
     onClose={() => (menuOpen = false)}
   />
 {/if}

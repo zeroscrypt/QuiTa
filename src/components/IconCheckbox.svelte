@@ -6,7 +6,14 @@
     onToggle,
   }: {
     checked: boolean;
-    /** Completed, but subtasks are still open: shown as a dash. */
+    /**
+     * Completed, but subtasks are still open: shown as a dash.
+     *
+     * This also drives `aria-checked="mixed"`. Announcing a partly-done task as
+     * plain checked is the state the whole `partial` concept exists to
+     * distinguish — it has its own colour, its own icon and its own rule in
+     * taskRules — and none of that reached the accessibility tree.
+     */
     partial?: boolean;
     label: string;
     onToggle: () => void;
@@ -18,7 +25,7 @@
   class:partial
   type="button"
   role="checkbox"
-  aria-checked={checked}
+  aria-checked={partial ? 'mixed' : checked}
   aria-label={label}
   onclick={(event) => {
     event.stopPropagation();
