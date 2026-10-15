@@ -125,13 +125,14 @@ pub fn create_task(
         auto_completed_by: None,
     };
     tx.execute(
-        "INSERT INTO tasks (id, parent_id, tab_id, title, created_at, updated_at, completed_at, deleted_at, due_date, comment, sort_order, completion_event_id, auto_completed_by)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, NULL, NULL, NULL, ?7, NULL, NULL)",
+        "INSERT INTO tasks (id, parent_id, tab_id, title, search_text, created_at, updated_at, completed_at, deleted_at, due_date, comment, sort_order, completion_event_id, auto_completed_by)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, NULL, NULL, NULL, ?8, NULL, NULL)",
         rusqlite::params![
             task.id,
             task.parent_id,
             task.tab_id,
             task.title,
+            crate::db::migrations::fold(&task.title),
             task.created_at,
             task.updated_at,
             task.sort_order
@@ -147,8 +148,8 @@ pub fn rename_task(conn: &mut Connection, id: &str, title: &str) -> Result<Task,
     get_task_row(&tx, id, false)?;
     let now = now_rfc3339();
     tx.execute(
-        "UPDATE tasks SET title = ?1, updated_at = ?2 WHERE id = ?3",
-        rusqlite::params![title, now, id],
+        "UPDATE tasks SET title = ?1, search_text = ?2, updated_at = ?3 WHERE id = ?4",
+        rusqlite::params![title, crate::db::migrations::fold(&title), now, id],
     )?;
     tx.commit()?;
     get_task_row(conn, id, false)
@@ -947,18 +948,22 @@ fn like_pattern(query: &str) -> String {
 /// Local search over titles. Soft-deleted and completed tasks are excluded by
 /// default. Subtask matches are returned with their parent's title so the UI
 /// can show context and expand the parent.
+///
+/// Both sides of the comparison are folded in Rust: the stored `search_text`
+/// column and the pattern built here. Folding only the stored side would trade
+/// one bug for another, since SQLite compares non-ASCII byte for byte.
 pub fn search_tasks(
     conn: &Connection,
     query: &str,
     tab_id: Option<&str>,
 ) -> Result<SearchResult, TaskError> {
-    let pattern = like_pattern(query);
+    let pattern = like_pattern(&crate::db::migrations::fold(query));
 
     let mut stmt = conn.prepare(&format!(
         "SELECT {TASK_COLUMNS} FROM tasks
          WHERE parent_id IS NULL AND deleted_at IS NULL AND completed_at IS NULL
            AND (?2 IS NULL OR tab_id = ?2)
-           AND title LIKE ?1 ESCAPE '\\'
+           AND search_text LIKE ?1 ESCAPE '\\'
          ORDER BY sort_order ASC"
     ))?;
     let roots = stmt
@@ -982,7 +987,7 @@ pub fn search_tasks(
              JOIN tasks p ON p.id = t.parent_id
              WHERE t.parent_id IS NOT NULL AND t.deleted_at IS NULL AND t.completed_at IS NULL
                AND (?2 IS NULL OR t.tab_id = ?2)
-               AND t.title LIKE ?1 ESCAPE '\\'
+               AND t.search_text LIKE ?1 ESCAPE '\\'
              ORDER BY t.sort_order ASC",
     )?;
     let matched_subtasks = stmt
@@ -1487,14 +1492,16 @@ pub fn import_tasks(
 
         if exists.is_some() {
             tx.execute(
-                "UPDATE tasks SET parent_id = ?1, tab_id = ?2, title = ?3, updated_at = ?4,
-                        completed_at = ?5, deleted_at = ?6, due_date = ?7, comment = ?8,
-                        sort_order = ?9, completion_event_id = ?10, auto_completed_by = ?11
-                 WHERE id = ?12",
+                "UPDATE tasks SET parent_id = ?1, tab_id = ?2, title = ?3, search_text = ?4,
+                        updated_at = ?5, completed_at = ?6, deleted_at = ?7, due_date = ?8,
+                        comment = ?9, sort_order = ?10, completion_event_id = ?11,
+                        auto_completed_by = ?12
+                 WHERE id = ?13",
                 rusqlite::params![
                     parent_id,
                     tab_id,
                     title,
+                    crate::db::migrations::fold(&title),
                     now,
                     task.completed_at,
                     task.deleted_at,
@@ -1509,15 +1516,16 @@ pub fn import_tasks(
             updated += 1;
         } else {
             tx.execute(
-                "INSERT INTO tasks (id, parent_id, tab_id, title, created_at, updated_at,
-                        completed_at, deleted_at, due_date, comment, sort_order,
+                "INSERT INTO tasks (id, parent_id, tab_id, title, search_text, created_at,
+                        updated_at, completed_at, deleted_at, due_date, comment, sort_order,
                         completion_event_id, auto_completed_by)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
                 rusqlite::params![
                     task.id,
                     parent_id,
                     tab_id,
                     title,
+                    crate::db::migrations::fold(&title),
                     task.created_at,
                     now,
                     task.completed_at,

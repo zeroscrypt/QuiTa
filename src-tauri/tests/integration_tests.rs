@@ -491,6 +491,76 @@ fn search_excludes_deleted_and_completed_tasks_by_default() {
 }
 
 #[test]
+fn search_finds_cyrillic_whatever_the_case() {
+    // SQLite folds case for ASCII only. Without the search_text column a
+    // Cyrillic title was findable only by its exact spelling, which in a
+    // Russian interface means typing the title over again.
+    let mut conn = open_test_db();
+    repository::create_task(&mut conn, "Купить Молоко", None, None, true).unwrap();
+
+    for query in ["молоко", "МОЛОКО", "Молоко", "МоЛоКо"] {
+        let found = repository::search_tasks(&conn, query, None).unwrap();
+        assert_eq!(found.roots.len(), 1, "запрос {query} ничего не нашёл");
+    }
+}
+
+#[test]
+fn search_finds_subtasks_in_any_case_too() {
+    let mut conn = open_test_db();
+    let parent = repository::create_task(&mut conn, "Продукты", None, None, true).unwrap();
+    repository::create_task(&mut conn, "Одна кофе", Some(&parent.id), None, true).unwrap();
+
+    let found = repository::search_tasks(&conn, "КОФЕ", None).unwrap();
+    assert_eq!(found.matched_subtasks.len(), 1);
+    assert_eq!(found.matched_subtasks[0].parent.title, "Продукты");
+}
+
+#[test]
+fn renaming_a_task_moves_it_to_the_new_folded_text() {
+    // A stale search_text would keep the task findable under its old
+    // title, which reads as the rename not having happened.
+    let mut conn = open_test_db();
+    let task = repository::create_task(&mut conn, "Старое", None, None, true).unwrap();
+    repository::rename_task(&mut conn, &task.id, "Новое Имя").unwrap();
+
+    assert_eq!(
+        repository::search_tasks(&conn, "новое имя", None)
+            .unwrap()
+            .roots
+            .len(),
+        1
+    );
+    assert_eq!(
+        repository::search_tasks(&conn, "старое", None)
+            .unwrap()
+            .roots
+            .len(),
+        0,
+        "старое название продолжает находиться"
+    );
+}
+
+#[test]
+fn tasks_written_before_the_search_column_are_still_findable() {
+    // A database created by an older build has no folded copy of the title.
+    // The backfill is what makes those rows searchable in any case.
+    let mut conn = open_test_db();
+    repository::create_task(&mut conn, "Старая задача", None, None, true).unwrap();
+    // Wipe the column the way a pre-migration row would look.
+    conn.execute("UPDATE tasks SET search_text = ''", [])
+        .unwrap();
+    migrations::run(&conn).unwrap();
+
+    assert_eq!(
+        repository::search_tasks(&conn, "СТАРАЯ", None)
+            .unwrap()
+            .roots
+            .len(),
+        1
+    );
+}
+
+#[test]
 fn search_matches_subtasks_with_parent_context() {
     let mut conn = open_test_db();
     let parent = repository::create_task(&mut conn, "Проект", None, None, true).unwrap();

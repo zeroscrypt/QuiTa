@@ -54,6 +54,10 @@ capture worthwhile *later*, never to slow down the moment you write it.
 No accounts. No cloud. No telemetry. The database is one SQLite file on your
 disk.
 
+<p align="center">
+  <img src="docs/screenshots/tasks.png" width="440" alt="QuiTa: tasks with subtasks, due dates and tabs along the bottom">
+</p>
+
 ### Who it is for
 
 - [x] People who **lose thoughts between tools** — a thought is not a project, it is a note that must not dissolve.
@@ -126,8 +130,8 @@ Windows, `.AppImage` + `.deb` on Linux.
 
 - [x] **Tabs as projects** — create, rename by double click, reorder by drag, automatic colour from a 10-colour palette. Deleting a tab moves its tasks to a neighbour: data loss is impossible.
 - [x] **Subtasks** — exactly one level deep, and that is the limit.
-- [x] **Due dates** — calendar dates with no timezone shift, overdue tasks highlighted, chips for today / tomorrow / +7 days.
-- [x] **Comments** — autosaved, opened with a double click.
+- [x] **Due dates** — calendar dates with no timezone shift, overdue tasks highlighted, chips for today / tomorrow.
+- [x] **Comments** — autosaved, opened from the button next to a task.
 - [x] **Storm entry** — the field never closes after `Enter`, the caret stays put.
 - [x] **Drag & drop** — three zones, no timers and no dwell.
 - [x] **Recycle bin** — soft cascade delete with automatic retention cleanup.
@@ -141,6 +145,18 @@ Windows, `.AppImage` + `.deb` on Linux.
 - [x] **Resizable window** — double-click the logo to fill the height of the screen's work area and widen by 1.6×. The taskbar and the menu bar never cover the window, and it always stays fully on screen.
 - [x] **Overdue highlighting** — a separate colour, not just a date.
 - [x] **Keyboard first** — `Enter` saves, `Esc` cancels, the caret never jumps.
+
+### Settings
+
+<p align="center">
+  <img src="docs/screenshots/settings-interface.png" width="215" alt="Language, theme, list view and the global shortcut">
+  <img src="docs/screenshots/settings-tasks.png" width="215" alt="Cascading completion, auto-delete, export and import">
+  <img src="docs/screenshots/settings-database.png" width="215" alt="Database size, active tasks, tabs">
+  <img src="docs/screenshots/settings-trash.png" width="215" alt="Trash with restore">
+</p>
+<p align="center">
+  <img src="docs/screenshots/about.png" width="300" alt="About: version, author, license, update check">
+</p>
 
 ### What QuiTa will never do
 
@@ -252,8 +268,8 @@ therefore testable without a window.
 | `pnpm tauri dev` | Run with hot reload |
 | `pnpm tauri build` | Installers for the current platform |
 | `pnpm check` | Svelte and TypeScript types |
-| `pnpm test` | 107 unit tests |
-| `cargo test --manifest-path src-tauri/Cargo.toml` | 92 Rust tests (18 unit + 74 integration against a real database) |
+| `pnpm test` | 115 unit tests |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | 114 Rust tests (40 unit + 74 integration against a real database) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Lints, errors as warnings |
 | `cargo audit` | Vulnerabilities in dependencies |
 
