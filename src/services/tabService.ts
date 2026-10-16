@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Tab, TabDeletion, TaskId } from "$lib/types";
+import type { Tab, TabDeletion, Task, TaskId } from "$lib/types";
 
 export function listTabs(): Promise<Tab[]> {
   return invoke<Tab[]>("list_tabs");
@@ -28,9 +28,22 @@ export function tabStats(): Promise<TabStat[]> {
   return invoke<TabStat[]>("tab_stats");
 }
 
-/** Deletes a tab; its tasks are moved to `fallbackTabId` so nothing is lost. */
+/**
+ * Hides a tab and remembers its tasks. The tasks stay in place until the undo
+ * window closes — see `finalizeTabDeletion`, which is the second half.
+ */
 export function deleteTab(id: TaskId): Promise<TabDeletion> {
   return invoke<TabDeletion>("delete_tab", { id });
+}
+
+/** Sends a hidden tab's tasks to the trash; called when the window passes. */
+export function finalizeTabDeletion(id: TaskId): Promise<Task[]> {
+  return invoke<Task[]>("finalize_tab_deletion", { id });
+}
+
+/** Finishes a deletion whose window was cut short by the app closing. */
+export function sweepPendingTabDeletions(): Promise<Task[]> {
+  return invoke<Task[]>("sweep_pending_tab_deletions");
 }
 
 export function restoreDeletedTab(

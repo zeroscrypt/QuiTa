@@ -139,6 +139,14 @@ export class UiStore {
       if (!current) return;
       current.secondsLeft -= 1;
       if (current.secondsLeft <= 0) {
+        // A tab deletion is only half-done until the window closes: the tasks
+        // are still in place, hidden behind a tab the strip no longer shows.
+        // Nobody was asked about that, so the window closing is the asking.
+        if (current.kind === "tab") {
+          void tabStore.finalize(current.deletion).catch((e) => {
+            taskStore.showError(e);
+          });
+        }
         this.clearUndo();
         return;
       }

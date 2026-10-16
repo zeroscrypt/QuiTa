@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDeletedHierarchy } from '../src/lib/trash';
+import { buildDeletedHierarchy, retentionVerdict } from '../src/lib/trash';
 import type { Task } from '../src/lib/types';
 
 function task(id: string, parentId: string | null, sortOrder: number): Task {
@@ -87,3 +87,39 @@ describe('buildDeletedHierarchy', () => {
     expect(buildDeletedHierarchy([])).toEqual([]);
   });
 });
+
+
+  describe('retentionVerdict', () => {
+    const now = Date.parse('2026-10-17T12:00:00Z');
+    const daysAgo = (n: number) => new Date(now - n * 86_400_000).toISOString();
+
+    it('never removes anything while the setting is empty', () => {
+      // The default is "no retention chosen", and a deletion the user never
+      // agreed to must not follow from a field they never filled in.
+      expect(retentionVerdict(daysAgo(400), null, now)).toEqual({ kind: 'never' });
+      expect(retentionVerdict(null, null, now)).toEqual({ kind: 'never' });
+    });
+
+    it('counts the days down from the moment the task was thrown away', () => {
+      expect(retentionVerdict(daysAgo(10), 30, now)).toEqual({
+        kind: 'inDays',
+        days: 20,
+      });
+      expect(retentionVerdict(daysAgo(0), 30, now)).toEqual({
+        kind: 'inDays',
+        days: 30,
+      });
+    });
+
+    it('treats an overdue row as leaving on the next launch', () => {
+      expect(retentionVerdict(daysAgo(30), 30, now)).toEqual({ kind: 'nextRun' });
+      expect(retentionVerdict(daysAgo(31), 30, now)).toEqual({ kind: 'nextRun' });
+    });
+
+    it('does not invent a deadline from a missing or broken timestamp', () => {
+      // A row with nothing to count from cannot promise time, but the rule is
+      // on — so it leaves on the next launch instead of claiming to be safe.
+      expect(retentionVerdict(null, 30, now)).toEqual({ kind: 'nextRun' });
+      expect(retentionVerdict('не дата', 30, now)).toEqual({ kind: 'nextRun' });
+    });
+  });

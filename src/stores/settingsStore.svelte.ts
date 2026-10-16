@@ -12,6 +12,7 @@ class SettingsStore {
   newestFirst = $state(true);
   autoDeleteDays = $state<number | null>(null);
   trashLimit = $state(200);
+  trashRetentionDays = $state<number | null>(null);
   language = $state<Language>('ru');
   loaded = $state(false);
 
@@ -26,6 +27,7 @@ class SettingsStore {
       this.newestFirst = settings.newestFirst ?? true;
       this.autoDeleteDays = settings.autoDeleteDays ?? null;
       this.trashLimit = settings.trashLimit ?? 200;
+      this.trashRetentionDays = settings.trashRetentionDays ?? null;
       this.language = settings.language ?? 'ru';
     } catch {
       // Defaults stay; the app remains usable if settings cannot be read.
@@ -86,6 +88,16 @@ class SettingsStore {
     await this.persist();
   }
 
+  /**
+   * `null` keeps what is in the trash until the user says otherwise. The default
+   * is `null` on purpose: a deletion nobody asked for must not follow from a
+   * setting nobody filled in.
+   */
+  async setTrashRetentionDays(days: number | null): Promise<void> {
+    this.trashRetentionDays = days;
+    await this.persist();
+  }
+
   async setLanguage(language: Language): Promise<void> {
     this.language = language;
     // `setLanguage` from the i18n module already updates `<html lang>`.
@@ -111,6 +123,7 @@ class SettingsStore {
       newestFirst: this.newestFirst,
       autoDeleteDays: this.autoDeleteDays,
       trashLimit: this.trashLimit,
+      trashRetentionDays: this.trashRetentionDays,
       language: this.language,
     };
     this.persistQueue = this.persistQueue.then(async () => {

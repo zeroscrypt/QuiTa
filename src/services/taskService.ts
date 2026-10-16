@@ -136,6 +136,11 @@ export function purgeCompletedTasks(): Promise<Task[]> {
   return invoke<Task[]>('purge_completed_tasks');
 }
 
+/** Removes trees that have sat in the trash longer than the configured period. */
+export function purgeTrashByAge(): Promise<Task[]> {
+  return invoke<Task[]>('purge_trash_by_age');
+}
+
 export function searchTasks(query: string, tabId: TaskId | null): Promise<SearchResult> {
   return invoke<SearchResult>('search_tasks', { query, tabId });
 }

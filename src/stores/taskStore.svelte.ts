@@ -2,6 +2,7 @@ import { untrack } from 'svelte';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { SearchResult, Task, TaskId, TaskNode } from '$lib/types';
 import * as taskService from '$services/taskService';
+import * as tabService from '$services/tabService';
 import { t } from '$i18n';
 import { truncate } from '$domain/taskRules';
 import { settingsStore } from './settingsStore.svelte';
@@ -58,13 +59,17 @@ class TaskStore {
   private unlistenShortcut: UnlistenFn | null = null;
 
   async init(): Promise<void> {
-    // Apply the retention policy before the first render so the list is correct.
-    if (settingsStore.autoDeleteDays !== null) {
-      try {
-        await taskService.purgeCompletedTasks();
-      } catch (e) {
-        this.showError(e);
-      }
+    // Apply the retention policies before the first render so the list is
+    // correct. Both are read by the command itself, which does nothing while
+    // the setting is empty.
+    try {
+      await taskService.purgeCompletedTasks();
+      await taskService.purgeTrashByAge();
+      // A tab hidden inside its undo window would stay hidden for ever if the
+      // app closed before the window closed with it.
+      await tabService.sweepPendingTabDeletions();
+    } catch (e) {
+      this.showError(e);
     }
     await this.load();
     // The Rust layer emits this when the global shortcut fires; the UI then

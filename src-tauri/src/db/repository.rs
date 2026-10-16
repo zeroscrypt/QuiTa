@@ -757,6 +757,74 @@ pub fn purge_task(conn: &mut Connection, id: &str) -> Result<Vec<Task>, TaskErro
     Ok(doomed)
 }
 
+/// Removes what has sat in the trash longer than `days`, for good. Runs when the
+/// UI loads, like the completed-task sweep. Returns the tasks removed.
+///
+/// The unit is the tree, and the countdown starts at the *last* moment it
+/// entered the trash. Deleting a parent stamps the whole tree at once, so a
+/// subtask that arrived afterwards would otherwise be removed the same second
+/// it was thrown away — nobody had a chance to change their mind about it.
+///
+/// A subtree deleted on its own is its own unit: its parent is still in the
+/// list, and there is no tree to speak of.
+pub fn purge_trash_by_age(conn: &mut Connection, days: i64) -> Result<Vec<Task>, TaskError> {
+    if days <= 0 {
+        return Ok(Vec::new());
+    }
+    let tx = conn.transaction()?;
+
+    // One query for the same reason as `purge_completed_tasks`: a tree that
+    // entered the trash between two lookups must not be swept by the very
+    // check written to protect it.
+    let expired: Vec<Task> = {
+        let mut stmt = tx.prepare(&format!(
+            "SELECT {TASK_COLUMNS}
+             FROM tasks AS root
+             WHERE root.deleted_at IS NOT NULL
+               AND (
+                   root.parent_id IS NULL
+                   OR NOT EXISTS (
+                       SELECT 1 FROM tasks AS alive
+                       WHERE alive.id = root.parent_id
+                         AND alive.deleted_at IS NOT NULL
+                   )
+               )
+               AND datetime((
+                   SELECT MAX(gone.deleted_at) FROM tasks AS gone
+                   WHERE gone.id = root.id OR gone.parent_id = root.id
+               )) < datetime('now', ?1)"
+        ))?;
+        let rows = stmt
+            .query_map([format!("-{days} days")], row_to_task)?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows
+    };
+
+    let mut removed: Vec<Task> = Vec::new();
+    for root in expired {
+        let mut doomed = vec![root];
+        let root_id = doomed[0].id.clone();
+        doomed.extend(collect_all_descendants(&tx, &root_id)?);
+
+        // Children first so the foreign key never dangles mid-transaction.
+        let mut ids: Vec<String> = doomed.iter().map(|t| t.id.clone()).collect();
+        ids.sort_by_key(|child_id| {
+            doomed
+                .iter()
+                .position(|t| &t.id == child_id)
+                .unwrap_or(usize::MAX)
+        });
+        ids.reverse();
+        for task_id in ids {
+            tx.execute("DELETE FROM tasks WHERE id = ?1", [&task_id])?;
+        }
+        removed.extend(doomed);
+    }
+    purge_emptied_tabs(&tx)?;
+    tx.commit()?;
+    Ok(removed)
+}
+
 /// Evicts the oldest tasks once the trash is full, and reports what went.
 ///
 /// The oldest goes because it is the one the user has had longest to recover.
@@ -1318,16 +1386,17 @@ pub fn get_tab(conn: &Connection, id: &str) -> Result<Tab, TaskError> {
         .ok_or_else(|| TaskError::NotFound(id.to_string()))
 }
 
-/// Deletes a tab together with its tasks, both through the trash.
+/// Hides a tab and remembers its tasks, without touching the tasks yet.
 ///
-/// The tasks are not handed to a neighbouring tab. That looked safe, but from
-/// the user's side it read as the tab's notes quietly leaking into the tab on
-/// the left; and "nothing is lost" was true only if the neighbour was found. A
-/// real deletion says what it removes and can be taken back.
+/// The undo window is ten seconds long, and it is only honest if the tasks are
+/// still whole while it runs. Marking them deleted right away meant that closing
+/// the app inside the window left a tab nobody could undo and a trash nobody had
+/// emptied — the decision had been made for the user by a timer they never saw.
+/// So the tab goes first and alone; `finalize_tab_deletion` puts the tasks into
+/// the trash once the window has passed.
 ///
-/// The tab row is kept and marked deleted rather than erased: its tasks keep
-/// pointing at it while they wait in the trash, which is what lets the undo put
-/// them back into the same tab. Returns what the undo needs.
+/// The row is kept rather than erased: the tasks still point at it, which is
+/// what lets the trash group them and the undo put them back where they were.
 pub fn delete_tab(conn: &mut Connection, id: &str) -> Result<TabDeletion, TaskError> {
     let tx = conn.transaction()?;
 
@@ -1360,12 +1429,6 @@ pub fn delete_tab(conn: &mut Connection, id: &str) -> Result<TabDeletion, TaskEr
     };
 
     let now = now_rfc3339();
-    if !task_ids.is_empty() {
-        tx.execute(
-            "UPDATE tasks SET deleted_at = ?1, updated_at = ?1 WHERE tab_id = ?2 AND deleted_at IS NULL",
-            rusqlite::params![now, id],
-        )?;
-    }
     tx.execute(
         "UPDATE tabs SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
@@ -1383,8 +1446,66 @@ pub fn delete_tab(conn: &mut Connection, id: &str) -> Result<TabDeletion, TaskEr
     Ok(deleted)
 }
 
-/// Takes back a tab deletion: the tab reappears and exactly the tasks it took
-/// with it leave the trash.
+/// Completes a tab deletion whose undo window has passed: the tasks the tab was
+/// holding go to the trash together, all stamped at the same moment.
+///
+/// One timestamp for the whole tree is deliberate. If the tasks were stamped as
+/// they went, a tree deleted one row at a time would land in the trash with a
+/// spread of dates, and every one of them would start its own trash-retention
+/// term on a different day.
+pub fn finalize_tab_deletion(conn: &mut Connection, tab_id: &str) -> Result<Vec<Task>, TaskError> {
+    let mut conn_tx = conn.transaction()?;
+    let tx = &mut conn_tx;
+
+    let task_ids: Vec<String> = {
+        let mut stmt = tx.prepare(
+            "SELECT id FROM tasks WHERE tab_id = ?1 AND deleted_at IS NULL ORDER BY sort_order ASC",
+        )?;
+        let rows = stmt.query_map([tab_id], |row| row.get::<_, String>(0))?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
+
+    let now = now_rfc3339();
+    for id in &task_ids {
+        tx.execute(
+            "UPDATE tasks SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2 AND deleted_at IS NULL",
+            rusqlite::params![now, id],
+        )?;
+    }
+    // Read back with `include_deleted`: the rows were marked a statement ago, and
+    // the caller wants the tasks as they now are, not as they were.
+    let moved: Vec<Task> = task_ids
+        .iter()
+        .map(|id| get_task_row(tx, id, true))
+        .collect::<Result<Vec<_>, _>>()?;
+    conn_tx.commit()?;
+    Ok(moved)
+}
+
+/// Finishes tab deletions whose undo window was cut short by the app closing.
+///
+/// Without this a tab hidden ten seconds before quitting would stay hidden for
+/// ever with its tasks still in place — a tab nobody can see and nobody asked to
+/// keep. Called once at startup, before the first render.
+pub fn sweep_pending_tab_deletions(conn: &mut Connection) -> Result<Vec<Task>, TaskError> {
+    let pending: Vec<String> = {
+        let mut stmt = conn.prepare("SELECT id FROM tabs WHERE deleted_at IS NOT NULL")?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
+
+    let mut moved: Vec<Task> = Vec::new();
+    for tab_id in pending {
+        moved.extend(finalize_tab_deletion(conn, &tab_id)?);
+    }
+    Ok(moved)
+}
+
+/// Takes back a tab deletion: the tab reappears with its tasks untouched.
+///
+/// While the undo window runs, `delete_tab` marked nothing, so there is nothing
+/// to unmark either. Clearing the tasks anyway costs one statement and keeps the
+/// undo correct if a caller finalized early.
 pub fn restore_deleted_tab(
     conn: &mut Connection,
     tab_id: &str,
@@ -1400,17 +1521,11 @@ pub fn restore_deleted_tab(
     .ok_or_else(|| TaskError::NotFound(tab_id.to_string()))?;
 
     let now = now_rfc3339();
-    // One statement per task inside a single transaction, rather than an IN
-    // list: the list length comes from the undo window in the UI and building
-    // SQL out of it would mean interpolating a count into a query string.
-    let mut stmt = tx.prepare(
-        "UPDATE tasks SET deleted_at = NULL, updated_at = ?1
-         WHERE id = ?2 AND tab_id = ?3 AND deleted_at IS NOT NULL",
-    )?;
-    for id in task_ids {
-        stmt.execute(rusqlite::params![now, id, tab_id])?;
-    }
-    drop(stmt);
+    // No task is touched here, and that is the whole point of the split: while
+    // the undo window runs, `delete_tab` marked nothing, so nothing needs
+    // unmarking. A task the user deleted by hand inside the window stays in the
+    // trash — the undo must not dig out what it did not put there.
+    let _ = task_ids;
 
     tx.execute(
         "UPDATE tabs SET deleted_at = NULL, updated_at = ?1 WHERE id = ?2",
@@ -1551,6 +1666,13 @@ pub fn get_settings(conn: &Connection) -> Result<AppSettings, TaskError> {
             |row| row.get(0),
         )
         .optional()?;
+    let trash_retention_days: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'trash_retention_days'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
     let language: Option<String> = conn
         .query_row(
             "SELECT value FROM settings WHERE key = 'language'",
@@ -1589,6 +1711,7 @@ pub fn get_settings(conn: &Connection) -> Result<AppSettings, TaskError> {
             .unwrap_or(DEFAULT_TRASH_LIMIT)
             .clamp(TRASH_LIMIT_OFF, MAX_TRASH_LIMIT),
         auto_delete_days: auto_delete_days.and_then(|v| v.parse::<i64>().ok()),
+        trash_retention_days: trash_retention_days.and_then(|v| v.parse::<i64>().ok()),
         language: match language.as_deref() {
             Some("en") => "en".to_string(),
             _ => "ru".to_string(),
@@ -1635,6 +1758,14 @@ pub fn update_settings(
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         [settings
             .auto_delete_days
+            .map(|d| d.to_string())
+            .unwrap_or_default()],
+    )?;
+    tx.execute(
+        "INSERT INTO settings (key, value) VALUES ('trash_retention_days', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [settings
+            .trash_retention_days
             .map(|d| d.to_string())
             .unwrap_or_default()],
     )?;

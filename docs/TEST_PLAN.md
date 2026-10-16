@@ -13,9 +13,9 @@
 | Набор | Команда | Тестов |
 |-------|---------|--------|
 | Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 40 |
-| Rust integration | то же | 100 |
+| Rust integration | то же | 109 |
 | Rust документация | то же (`tests/documentation.rs`) | 4 |
-| TypeScript | `pnpm test` | 147 |
+| TypeScript | `pnpm test` | 157 |
 
 Числа берутся из фактического прогона. Если они разошлись с таблицей —
 значит, тесты забыли пересчитать, и это такое же расхождение кода и
@@ -92,6 +92,16 @@
 | `purge_moves_a_finished_tree_to_the_trash` | Закрытое дерево уходит в корзину вместе с подзадачами, а не исчезает |
 | `purge_waits_for_the_last_closure_in_the_tree` | Отсчёт идёт от последнего завершения в дереве |
 | `purge_leaves_a_tree_with_open_work_alone` | Незавершённая подзадача удерживает дерево, закрытая подзадача не уходит от открытого родителя |
+
+### Срок в корзине
+
+| Тест | Что проверяет |
+|------|---------------|
+| `purge_trash_by_age_removes_an_expired_tree` | Просроченное дерево удаляется из базы совсем, а свежая задача остаётся |
+| `purge_trash_by_age_waits_for_the_latest_deletion_in_the_tree` | Отсчёт идёт от последнего удаления в дереве, а не от первого |
+| `purge_trash_by_age_treats_a_deleted_subtask_on_its_own_as_its_own_unit` | Удалённая отдельно подзадача уходит сама, живой родитель остаётся |
+| `purge_trash_by_age_is_off_until_it_is_asked_for` | Настройка пуста по умолчанию: срок, о котором не просили, ничего не удаляет |
+| `the_trash_retention_is_stored_and_cleared_again` | Срок сохраняется и снимается обратно |
 
 ### Сроки
 
@@ -214,6 +224,7 @@ SSR-рендер компонента задачи — проверяет кон
 | `reparent moves a task under another parent` | Перенос задачи к другому родителю |
 | `moveToTab sends the task to another tab` | Перенос задачи в другую вкладку |
 | `purges expired completed tasks when the retention setting is on` | Автоочистка по настройке хранения |
+| `sweeps the trash by age on every start, setting or no setting` | Подметание корзины по сроку вызывается всегда: настройку читает команда |
 | `passes the cascade setting from the store` | Настройка каскада доходит до команды |
 | `keeps completed tasks visible when the setting is on` | Настройка показа завершённых учитывается |
 
@@ -271,6 +282,16 @@ SSR-рендер компонента задачи — проверяет кон
 | `hides the right fade at the very end` | Правый градиент в конце |
 | `moves roughly one screen per click` | Шаг кнопки прокрутки |
 
+### `tests/tabDeletion.test.ts`
+
+| Тест | Что проверяет |
+|------|---------------|
+| `hides the tab and leaves its tasks alone until the window closes` | Вкладка исчезает сразу, задачи не трогаются, `finalize_tab_deletion` не вызывается |
+| `refuses to remove the last tab without asking the backend` | Последняя вкладка не удаляется и запроса к бэкенду нет |
+| `sends the tasks to the trash when the undo window runs out` | По истечении десяти секунд задачи уходят в корзину |
+| `sends nothing to the trash when the user undoes inside the window` | Откат внутри окна отменяет вторую половину удаления |
+| `starting up > finishes a tab deletion the app closed in the middle of` | Подметание при старте |
+
 ### `tests/trash.test.ts`
 
 | Тест | Что проверяет |
@@ -281,6 +302,10 @@ SSR-рендер компонента задачи — проверяет кон
 | `sorts siblings by their order instead of the arrival order` | Порядок берётся из `sort_order` |
 | `does not lose a task when the data is malformed` | Устойчивость к битым данным |
 | `handles an empty trash` | Пустая корзина |
+| `never removes anything while the setting is empty` | Пустая настройка срока не удаляет ничего |
+| `counts the days down from the moment the task was thrown away` | Подпись считает дни от даты удаления |
+| `treats an overdue row as leaving on the next launch` | Просроченная строка уходит при следующем запуске |
+| `does not invent a deadline from a missing or broken timestamp` | Битая дата не превращается в обещание |
 
 ### `tests/text.test.ts`
 
@@ -395,8 +420,8 @@ GitHub Actions (`.github/workflows/ci.yml`):
 
 | Проверка | Команда | Результат |
 |----------|---------|-----------|
-| Тесты UI | `pnpm test` | 147 из 147 пройдено (20 файлов) |
-| Тесты Rust | `cargo test` | 40 unit + 100 интеграционных + 4 на документацию |
+| Тесты UI | `pnpm test` | 157 из 157 пройдено (21 файл) |
+| Тесты Rust | `cargo test` | 40 unit + 109 интеграционных + 4 на документацию |
 
 Более ранний прогон, на котором сняты остальные строки таблицы:
 
@@ -441,8 +466,11 @@ GitHub Actions (`.github/workflows/ci.yml`):
 | `error_messages_serialize_as_strings` | ошибки доходят до UI строкой, а не `[object Object]` |
 | `moving_a_subtask_to_another_tab_moves_its_parent` | дерево задач никогда не разрывается между вкладками |
 | `purge_refuses_a_task_that_is_not_deleted` | необратимое удаление доступно только для мягко удалённых задач |
-| `deleting_a_tab_takes_its_tasks_to_the_trash_and_keeps_the_last_one` | задачи вкладки уходят в корзину, а соседняя остаётся пустой |
-| `undoing_a_tab_deletion_brings_the_tab_and_its_tasks_back` | откат возвращает вкладку и ровно те задачи, что унесла |
+| `deleting_a_tab_hides_it_first_and_keeps_the_last_one` | вкладка прячется сразу, задачи ждут конца окна; последняя вкладка не удаляется |
+| `undoing_a_tab_deletion_before_the_window_ends_keeps_every_task_in_place` | откат внутри окна возвращает вкладку и не трогает корзину |
+| `the_window_ending_moves_the_tasks_with_one_timestamp` | дерево уходит в корзину одной меткой времени, иначе сроки в корзине разъезжаются |
+| `a_tab_hidden_by_a_closed_app_is_finished_on_the_next_launch` | закрытие приложения внутри окна не оставляет вкладку скрытой навсегда |
+| `the_sweep_leaves_tabs_that_are_merely_hidden_by_a_restored_task` | подметание не выносит на свежий воздух живую вкладку |
 | `a_deleted_tabs_tasks_keep_pointing_at_it` | удалённая вкладка не отдаёт задачи соседней |
 | `restoring_a_task_from_a_deleted_tab_brings_the_tab_back` | восстановление задачи возвращает и вкладку |
 | `emptying_the_trash_drops_tabs_nothing_points_at` | опустевшая вкладка удаляется из базы |

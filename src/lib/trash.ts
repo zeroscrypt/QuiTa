@@ -61,3 +61,40 @@ export function buildDeletedHierarchy(tasks: Task[]): DeletedNode[] {
   }
   return nodes;
 }
+
+/** What the trash row says about its own removal. */
+export type RetentionVerdict =
+  | { kind: 'never' }
+  | { kind: 'nextRun' }
+  | { kind: 'inDays'; days: number };
+
+/**
+ * How long a trashed task has left, counted from the moment it entered the
+ * bin.
+ *
+ * The count is deliberately taken from `deletedAt` and nothing else, because
+ * that is what the backend counts from as well: the newest deletion in the
+ * tree. A subtask deleted after its parent therefore starts its own term, and
+ * the label can never promise more time than the code will grant.
+ *
+ * `null` means the row is never removed automatically — either because the
+ * user left the setting empty, or because the row has no timestamp to count
+ * from, which is not a reason to invent a deadline.
+ */
+export function retentionVerdict(
+  deletedAt: string | null,
+  retentionDays: number | null,
+  now: number = Date.now(),
+): RetentionVerdict {
+  if (retentionDays === null) return { kind: 'never' };
+  if (!deletedAt) return { kind: 'nextRun' };
+  const deletedMs = Date.parse(deletedAt);
+  // An unparseable timestamp is treated as overdue rather than as "never": the
+  // rule is on, and a row the clock cannot read is one the clock has passed.
+  const elapsedDays = Number.isNaN(deletedMs)
+    ? Number.POSITIVE_INFINITY
+    : Math.floor((now - deletedMs) / 86_400_000);
+  const left = retentionDays - elapsedDays;
+  if (left <= 0) return { kind: 'nextRun' };
+  return { kind: 'inDays', days: left };
+}

@@ -709,6 +709,9 @@ fn the_export_keeps_a_deleted_tab_and_its_tasks() {
     let kept = repository::create_task(&mut conn, "Остаётся", None, Some(&work.id), true).unwrap();
     let gone = repository::create_task(&mut conn, "Уходит", None, Some(&work.id), true).unwrap();
     repository::delete_tab(&mut conn, &work.id).unwrap();
+    // The undo window passed, so the tasks left with the tab: the snapshot has
+    // to carry the picture *after* the deletion, not midway through it.
+    repository::finalize_tab_deletion(&mut conn, &work.id).unwrap();
 
     let exported = repository::list_tabs_including_deleted(&conn).unwrap();
     assert!(
@@ -1140,6 +1143,142 @@ fn purge_leaves_a_tree_with_open_work_alone() {
 }
 
 #[test]
+fn purge_trash_by_age_removes_an_expired_tree() {
+    let mut conn = open_test_db();
+    let root = repository::create_task(&mut conn, "В корзине", None, None, true).unwrap();
+    let child =
+        repository::create_task(&mut conn, "Её подзадача", Some(&root.id), None, true).unwrap();
+    let fresh = repository::create_task(&mut conn, "Свежая", None, None, true).unwrap();
+    repository::soft_delete_task(&mut conn, &root.id).unwrap();
+    repository::soft_delete_task(&mut conn, &fresh.id).unwrap();
+
+    conn.execute(
+        "UPDATE tasks SET deleted_at = datetime('now', '-40 days')
+         WHERE id = ?1 OR parent_id = ?1",
+        [&root.id],
+    )
+    .unwrap();
+
+    let removed = repository::purge_trash_by_age(&mut conn, 30).unwrap();
+    assert_eq!(removed.len(), 2, "дерево уходит целиком, родитель первым");
+    assert_eq!(removed[0].id, root.id);
+
+    // For good: the rows are gone, not unflagged. A task still sitting in the
+    // trash would be one the user could "restore" out of nowhere.
+    for id in [&root.id, &child.id] {
+        let left: i64 = conn
+            .query_row("SELECT COUNT(*) FROM tasks WHERE id = ?1", [id], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(left, 0, "{id} должен быть удалён из базы совсем");
+    }
+    assert_eq!(repository::list_deleted_all(&conn, 50, 0).unwrap().len(), 1);
+}
+
+#[test]
+fn purge_trash_by_age_waits_for_the_latest_deletion_in_the_tree() {
+    let mut conn = open_test_db();
+    let root = repository::create_task(&mut conn, "Родитель", None, None, true).unwrap();
+    let child = repository::create_task(&mut conn, "Поздняя", Some(&root.id), None, true).unwrap();
+    repository::soft_delete_task(&mut conn, &root.id).unwrap();
+
+    // The parent went to the trash long ago, the subtree joined it two days ago.
+    conn.execute(
+        "UPDATE tasks SET deleted_at = datetime('now', '-40 days') WHERE id = ?1",
+        [&root.id],
+    )
+    .unwrap();
+    conn.execute(
+        "UPDATE tasks SET deleted_at = datetime('now', '-2 days') WHERE id = ?1",
+        [&child.id],
+    )
+    .unwrap();
+
+    assert!(
+        repository::purge_trash_by_age(&mut conn, 30)
+            .unwrap()
+            .is_empty(),
+        "отсчёт идёт от последнего попадания в корзину, а не от первого"
+    );
+    assert_eq!(repository::list_deleted_all(&conn, 50, 0).unwrap().len(), 2);
+}
+
+#[test]
+fn purge_trash_by_age_treats_a_deleted_subtask_on_its_own_as_its_own_unit() {
+    let mut conn = open_test_db();
+    let root = repository::create_task(&mut conn, "Живой родитель", None, None, true).unwrap();
+    let child =
+        repository::create_task(&mut conn, "Выброшенная", Some(&root.id), None, true).unwrap();
+    repository::soft_delete_task(&mut conn, &child.id).unwrap();
+    conn.execute(
+        "UPDATE tasks SET deleted_at = datetime('now', '-40 days') WHERE id = ?1",
+        [&child.id],
+    )
+    .unwrap();
+
+    let removed = repository::purge_trash_by_age(&mut conn, 30).unwrap();
+    assert_eq!(removed.len(), 1);
+    assert_eq!(removed[0].id, child.id);
+    assert!(
+        active_task(&conn, &root.id).title == "Живой родитель",
+        "подзадача уходит сама, родитель из этого не вытекается"
+    );
+}
+
+#[test]
+fn purge_trash_by_age_is_off_until_it_is_asked_for() {
+    let mut conn = open_test_db();
+    let task = repository::create_task(&mut conn, "Старая", None, None, true).unwrap();
+    repository::soft_delete_task(&mut conn, &task.id).unwrap();
+    conn.execute(
+        "UPDATE tasks SET deleted_at = datetime('now', '-400 days') WHERE id = ?1",
+        [&task.id],
+    )
+    .unwrap();
+
+    // The setting is empty out of the box: a retention nobody chose must not
+    // delete anything on its own.
+    assert_eq!(
+        repository::get_settings(&conn)
+            .unwrap()
+            .trash_retention_days,
+        None
+    );
+    assert!(repository::purge_trash_by_age(&mut conn, 0)
+        .unwrap()
+        .is_empty());
+    assert!(repository::purge_trash_by_age(&mut conn, -1)
+        .unwrap()
+        .is_empty());
+    assert_eq!(repository::list_deleted_all(&conn, 50, 0).unwrap().len(), 1);
+}
+
+#[test]
+fn the_trash_retention_is_stored_and_cleared_again() {
+    let mut conn = open_test_db();
+    let mut settings = repository::get_settings(&conn).unwrap();
+
+    settings.trash_retention_days = Some(90);
+    repository::update_settings(&mut conn, &settings).unwrap();
+    assert_eq!(
+        repository::get_settings(&conn)
+            .unwrap()
+            .trash_retention_days,
+        Some(90)
+    );
+
+    settings.trash_retention_days = None;
+    repository::update_settings(&mut conn, &settings).unwrap();
+    assert_eq!(
+        repository::get_settings(&conn)
+            .unwrap()
+            .trash_retention_days,
+        None
+    );
+}
+
+#[test]
 fn tasks_created_before_tabs_are_adopted_by_the_first_tab() {
     // Simulate a database upgraded from migration v1: tasks with NULL tab_id.
     let conn = Connection::open_in_memory().unwrap();
@@ -1216,7 +1355,7 @@ fn tabs_split_tasks_and_get_distinct_colors() {
 }
 
 #[test]
-fn deleting_a_tab_takes_its_tasks_to_the_trash_and_keeps_the_last_one() {
+fn deleting_a_tab_hides_it_first_and_keeps_the_last_one() {
     let mut conn = open_test_db();
     let first = repository::ensure_default_tab(&conn).unwrap();
     let second = repository::create_tab(&conn, "Работа").unwrap();
@@ -1233,11 +1372,19 @@ fn deleting_a_tab_takes_its_tasks_to_the_trash_and_keeps_the_last_one() {
     assert_eq!(remaining.len(), 1);
     assert_eq!(remaining[0].id, first.id);
 
-    // The task goes to the trash and does not appear under the tab on the left.
-    // It used to be moved there, which read as the notes quietly leaking across.
+    // The task is NOT in the trash yet: the undo window is still running, and
+    // the whole point of the two-step deletion is that closing the app inside
+    // the window leaves a tab you can still take back rather than a decision
+    // nobody agreed to. The tasks go when the window passes.
     assert!(
-        deleted_at_of(&conn, &task.id).is_some(),
-        "the task did not reach the trash"
+        deleted_at_of(&conn, &task.id).is_none(),
+        "the task was marked before the undo window ended"
+    );
+    assert!(
+        repository::list_deleted_all(&conn, 50, 0)
+            .unwrap()
+            .is_empty(),
+        "the trash stayed empty"
     );
     assert!(
         repository::list_task_nodes(&conn, false, Some(&first.id))
@@ -1245,6 +1392,11 @@ fn deleting_a_tab_takes_its_tasks_to_the_trash_and_keeps_the_last_one() {
             .is_empty(),
         "the neighbouring tab stayed empty"
     );
+
+    // The window passed: now the tab's tasks leave together, one timestamp.
+    let moved = repository::finalize_tab_deletion(&mut conn, &second.id).unwrap();
+    assert_eq!(moved.len(), 1);
+    assert!(deleted_at_of(&conn, &task.id).is_some());
     assert_eq!(
         repository::list_deleted_all(&conn, 50, 0).unwrap().len(),
         1,
@@ -1296,6 +1448,130 @@ fn undoing_a_tab_deletion_brings_the_tab_and_its_tasks_back() {
 }
 
 #[test]
+fn undoing_a_tab_deletion_before_the_window_ends_keeps_every_task_in_place() {
+    let mut conn = open_test_db();
+    let _first = repository::ensure_default_tab(&conn).unwrap();
+    let work = repository::create_tab(&conn, "Работа").unwrap();
+    let keep = repository::create_task(&mut conn, "Остаётся", None, Some(&work.id), true).unwrap();
+    let gone = repository::create_task(&mut conn, "Уходит", None, Some(&work.id), true).unwrap();
+    // A task the user deleted by hand must stay in the trash after the undo:
+    // the tab deletion must not dig out what it did not put there.
+    let earlier = repository::create_task(&mut conn, "Старая", None, Some(&work.id), true).unwrap();
+    repository::soft_delete_task(&mut conn, &earlier.id).unwrap();
+
+    let deleted = repository::delete_tab(&mut conn, &work.id).unwrap();
+    // Nothing was marked, so the undo has nothing to undo for the tasks.
+    assert!(deleted_at_of(&conn, &keep.id).is_none());
+    assert!(deleted_at_of(&conn, &gone.id).is_none());
+
+    let restored = repository::restore_deleted_tab(&mut conn, &work.id, &deleted.task_ids).unwrap();
+    assert_eq!(restored.tab.id, work.id);
+    assert!(restored.tab.deleted_at.is_none());
+    assert!(
+        repository::list_tabs(&conn)
+            .unwrap()
+            .iter()
+            .any(|t| t.id == work.id),
+        "the tab is back in the strip"
+    );
+    assert_eq!(
+        repository::list_task_nodes(&conn, false, Some(&work.id))
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(
+        deleted_at_of(&conn, &earlier.id).is_some(),
+        "the undo must not dig out of the trash what it did not put there"
+    );
+}
+
+#[test]
+fn the_window_ending_moves_the_tasks_with_one_timestamp() {
+    let mut conn = open_test_db();
+    let _first = repository::ensure_default_tab(&conn).unwrap();
+    let work = repository::create_tab(&conn, "Работа").unwrap();
+    let first = repository::create_task(&mut conn, "Первая", None, Some(&work.id), true).unwrap();
+    let second = repository::create_task(&mut conn, "Вторая", None, Some(&work.id), true).unwrap();
+    let child = repository::create_task(&mut conn, "Под", Some(&first.id), None, true).unwrap();
+
+    repository::delete_tab(&mut conn, &work.id).unwrap();
+    let moved = repository::finalize_tab_deletion(&mut conn, &work.id).unwrap();
+    assert_eq!(moved.len(), 3, "подзадачи уходят вместе с родителем");
+
+    // One timestamp for the whole tree: a tree stamped row by row would arrive
+    // in the trash with a spread of dates, and each row would start its own
+    // trash-retention term on a different day.
+    let stamps: Vec<String> = [&first.id, &second.id, &child.id]
+        .iter()
+        .map(|id| deleted_at_of(&conn, id).unwrap())
+        .collect();
+    assert!(
+        stamps.windows(2).all(|w| w[0] == w[1]),
+        "задачи дерева должны носить одну метку времени: {stamps:?}"
+    );
+}
+
+#[test]
+fn a_tab_hidden_by_a_closed_app_is_finished_on_the_next_launch() {
+    let mut conn = open_test_db();
+    let _first = repository::ensure_default_tab(&conn).unwrap();
+    let work = repository::create_tab(&conn, "Работа").unwrap();
+    let task = repository::create_task(&mut conn, "Задача", None, Some(&work.id), true).unwrap();
+
+    // The app closed inside the undo window: the tab is hidden and the tasks are
+    // still in place. Without a sweep it would stay that way for ever — a tab
+    // nobody can see and nobody asked to keep.
+    repository::delete_tab(&mut conn, &work.id).unwrap();
+    assert!(deleted_at_of(&conn, &task.id).is_none());
+
+    let swept = repository::sweep_pending_tab_deletions(&mut conn).unwrap();
+    assert_eq!(swept.len(), 1);
+    assert!(
+        deleted_at_of(&conn, &task.id).is_some(),
+        "подметание не доделало удаление"
+    );
+    assert!(!repository::list_deleted_all(&conn, 50, 0)
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
+fn the_sweep_leaves_tabs_that_are_merely_hidden_by_a_restored_task() {
+    // Restoring one task out of a deleted tab brings the tab back. The sweep
+    // must not then decide that tab is a pending deletion and empty it.
+    let mut conn = open_test_db();
+    let _first = repository::ensure_default_tab(&conn).unwrap();
+    let work = repository::create_tab(&conn, "Работа").unwrap();
+    let task = repository::create_task(&mut conn, "Задача", None, Some(&work.id), true).unwrap();
+
+    repository::delete_tab(&mut conn, &work.id).unwrap();
+    repository::finalize_tab_deletion(&mut conn, &work.id).unwrap();
+    repository::restore_task(&mut conn, &task.id).unwrap();
+    assert!(
+        repository::list_tabs(&conn)
+            .unwrap()
+            .iter()
+            .any(|t| t.id == work.id),
+        "восстановление задачи вернуло вкладку"
+    );
+
+    let swept = repository::sweep_pending_tab_deletions(&mut conn).unwrap();
+    assert!(
+        swept.is_empty(),
+        "подметание не должно трогать живую вкладку: {:?}",
+        swept.iter().map(|t| &t.title).collect::<Vec<_>>()
+    );
+    assert!(deleted_at_of(&conn, &task.id).is_none());
+    assert_eq!(
+        repository::list_task_nodes(&conn, false, Some(&work.id))
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[test]
 fn the_last_visible_tab_survives_deleted_ones() {
     // A tab deleted earlier is still a row, but it must not make the final
     // live tab undeletable.
@@ -1336,6 +1612,7 @@ fn restoring_a_task_from_a_deleted_tab_brings_the_tab_back() {
     let task = repository::create_task(&mut conn, "Задача", None, Some(&work.id), true).unwrap();
 
     repository::delete_tab(&mut conn, &work.id).unwrap();
+    repository::finalize_tab_deletion(&mut conn, &work.id).unwrap();
     assert_eq!(repository::list_tabs(&conn).unwrap().len(), 1);
 
     repository::restore_task(&mut conn, &task.id).unwrap();
@@ -1363,6 +1640,7 @@ fn emptying_the_trash_drops_tabs_nothing_points_at() {
     repository::create_task(&mut conn, "Задача", None, Some(&work.id), true).unwrap();
 
     repository::delete_tab(&mut conn, &work.id).unwrap();
+    repository::finalize_tab_deletion(&mut conn, &work.id).unwrap();
     let rows: i64 = conn
         .query_row("SELECT COUNT(*) FROM tabs WHERE id = ?1", [&work.id], |r| {
             r.get(0)
@@ -2342,6 +2620,7 @@ fn export_carries_the_whole_state_and_import_reproduces_it() {
         newest_first: false,
         auto_delete_days: Some(14),
         trash_limit: repository::DEFAULT_TRASH_LIMIT,
+        trash_retention_days: None,
         language: "en".to_string(),
     };
     repository::update_settings(&mut conn, &settings).unwrap();
@@ -2393,6 +2672,7 @@ fn importing_a_state_file_restores_tabs_hierarchy_and_settings() {
             newest_first: false,
             auto_delete_days: Some(7),
             trash_limit: repository::DEFAULT_TRASH_LIMIT,
+            trash_retention_days: None,
             language: "en".to_string(),
         },
     )

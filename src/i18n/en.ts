@@ -183,6 +183,10 @@ export const en: Record<string, string> = {
   "settings.trashLimit": "How many tasks the trash keeps",
   "settings.trashLimitHint":
     "When the trash is full, deleting another task pushes the oldest one out for good, together with its subtasks. Zero turns the rule off.",
+  "settings.trashRetention": "How many days the trash keeps",
+  "settings.trashRetentionDays": "After how many days",
+  "settings.trashRetentionHint":
+    "A task that has sat in the trash that many days is removed for good on the next launch. The countdown starts at the last deletion in the tree: a subtask deleted after its parent gets its full time. Leave empty to keep everything until you delete it by hand.",
   "trash.evicted": "Trash full: “{title}” is gone for good",
   "trash.evictedMany": "Trash full: {count} tasks are gone for good",
   "settings.data": "Data",
