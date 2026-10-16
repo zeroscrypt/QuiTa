@@ -111,8 +111,17 @@ jobs:
     name: Merge release PR after CI is green
     needs: release-please
     runs-on: ubuntu-latest
-    # Nothing to merge once the tag exists: that is the run that builds.
-    if: needs.release-please.outputs.released != 'true'
+    # No guard on `released` here, and the reason is a run that did both things.
+    #
+    # When Release Please finished a release it had already merged, it also
+    # opened the pull request for the next one. Skipping this job because "a
+    # release was created" left that pull request standing until some later push
+    # came along to merge it — a day away, in a repository that is quiet.
+    #
+    # Nothing here needs the guard. The step below takes its number from the
+    # action's own output and leaves early on every case it cannot handle: no
+    # pull request reported, the pull request closed, a branch that is not
+    # Release Please's, a base that moved on.
     permissions:
       contents: write
       pull-requests: write
