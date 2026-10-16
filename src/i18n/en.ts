@@ -182,7 +182,7 @@ export const en: Record<string, string> = {
   "settings.autoDeleteDays": "After how many days",
   "settings.trashLimit": "How many tasks the trash keeps",
   "settings.trashLimitHint":
-    "When the trash is full, deleting another task pushes the oldest one out for good, together with its subtasks. Zero turns the rule off.",
+    "When the trash is full, the next task pushes the oldest one out for good, together with its subtasks. The rule holds on every path into the bin — a task you delete, the completion timer, a whole tab. Zero turns it off entirely.",
   "settings.trashRetention": "How many days the trash keeps",
   "settings.trashRetentionDays": "After how many days",
   "settings.trashRetentionHint":

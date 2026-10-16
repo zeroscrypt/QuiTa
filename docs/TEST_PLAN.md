@@ -13,9 +13,9 @@
 | Набор | Команда | Тестов |
 |-------|---------|--------|
 | Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 40 |
-| Rust integration | то же | 109 |
+| Rust integration | то же | 112 |
 | Rust документация | то же (`tests/documentation.rs`) | 4 |
-| TypeScript | `pnpm test` | 157 |
+| TypeScript | `pnpm test` | 159 |
 
 Числа берутся из фактического прогона. Если они разошлись с таблицей —
 значит, тесты забыли пересчитать, и это такое же расхождение кода и
@@ -102,6 +102,9 @@
 | `purge_trash_by_age_treats_a_deleted_subtask_on_its_own_as_its_own_unit` | Удалённая отдельно подзадача уходит сама, живой родитель остаётся |
 | `purge_trash_by_age_is_off_until_it_is_asked_for` | Настройка пуста по умолчанию: срок, о котором не просили, ничего не удаляет |
 | `the_trash_retention_is_stored_and_cleared_again` | Срок сохраняется и снимается обратно |
+| `the_completion_timer_pushes_the_oldest_out_when_the_trash_is_full` | Таймер завершённых уважает предел корзины и объявляет вытеснение |
+| `a_deleted_tab_pushes_the_oldest_out_when_the_trash_is_full` | Удаление вкладки уважает предел корзины |
+| `the_startup_sweep_pushes_the_oldest_out_when_the_trash_is_full` | Подметание при запуске уважает предел корзины |
 
 ### Сроки
 
@@ -420,8 +423,8 @@ GitHub Actions (`.github/workflows/ci.yml`):
 
 | Проверка | Команда | Результат |
 |----------|---------|-----------|
-| Тесты UI | `pnpm test` | 157 из 157 пройдено (21 файл) |
-| Тесты Rust | `cargo test` | 40 unit + 109 интеграционных + 4 на документацию |
+| Тесты UI | `pnpm test` | 159 из 159 пройдено (21 файл) |
+| Тесты Rust | `cargo test` | 40 unit + 112 интеграционных + 4 на документацию |
 
 Более ранний прогон, на котором сняты остальные строки таблицы:
 

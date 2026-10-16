@@ -4,6 +4,8 @@ use crate::db::{repository, Db};
 use crate::domain::task::{Tab, TaskId};
 use crate::error::TaskError;
 
+use super::task_commands::DeleteOutcome;
+
 #[tauri::command]
 pub async fn list_tabs(db: State<'_, Db>) -> Result<Vec<Tab>, TaskError> {
     let conn = db.lock().map_err(TaskError::Internal)?;
@@ -54,23 +56,38 @@ pub async fn delete_tab(
 }
 
 /// Sends a tab's tasks to the trash once its undo window has passed.
+///
+/// The trash limit is enforced here for the same reason as in a deletion by
+/// hand: a whole tab arriving at once is the fastest way to push the bin past
+/// its bound, and a bound that holds only for single tasks is not a bound.
 #[tauri::command]
 pub async fn finalize_tab_deletion(
     id: TaskId,
     db: State<'_, Db>,
-) -> Result<Vec<crate::domain::task::Task>, TaskError> {
+) -> Result<DeleteOutcome, TaskError> {
     let mut conn = db.lock().map_err(TaskError::Internal)?;
-    repository::finalize_tab_deletion(&mut conn, &id)
+    let settings = repository::get_settings(&conn)?;
+    let sweep = repository::finalize_tab_deletion(&mut conn, &id, settings.trash_limit)?;
+    Ok(DeleteOutcome {
+        deleted: sweep.moved,
+        evicted: sweep.evicted,
+    })
 }
 
 /// Finishes a tab deletion whose undo window was cut short by the app closing,
 /// so a tab hidden ten seconds before quitting does not stay hidden for ever.
+///
+/// Runs before the first render, so nothing is being watched yet — the eviction
+/// is announced by the interface that loads next.
 #[tauri::command]
-pub async fn sweep_pending_tab_deletions(
-    db: State<'_, Db>,
-) -> Result<Vec<crate::domain::task::Task>, TaskError> {
+pub async fn sweep_pending_tab_deletions(db: State<'_, Db>) -> Result<DeleteOutcome, TaskError> {
     let mut conn = db.lock().map_err(TaskError::Internal)?;
-    repository::sweep_pending_tab_deletions(&mut conn)
+    let settings = repository::get_settings(&conn)?;
+    let sweep = repository::sweep_pending_tab_deletions(&mut conn, settings.trash_limit)?;
+    Ok(DeleteOutcome {
+        deleted: sweep.moved,
+        evicted: sweep.evicted,
+    })
 }
 
 /// Takes back a tab deletion within the undo window.

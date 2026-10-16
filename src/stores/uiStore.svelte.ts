@@ -143,9 +143,12 @@ export class UiStore {
         // are still in place, hidden behind a tab the strip no longer shows.
         // Nobody was asked about that, so the window closing is the asking.
         if (current.kind === "tab") {
-          void tabStore.finalize(current.deletion).catch((e) => {
-            taskStore.showError(e);
-          });
+          void tabStore
+            .finalize(current.deletion)
+            .then((evicted) => taskStore.announceEviction(evicted))
+            .catch((e) => {
+              taskStore.showError(e);
+            });
         }
         this.clearUndo();
         return;

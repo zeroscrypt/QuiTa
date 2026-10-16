@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::domain::rules::{compute_toggle_plan, TogglePlan};
 use crate::domain::task::{
     AppSettings, ChildPlacement, DbStats, MatchedSubtask, ReparentReceipt, SearchResult, Tab,
-    TabDeletion, TabStat, Task, TaskNode, ToggleOutcome, TAB_COLORS,
+    TabDeletion, TabStat, Task, TaskNode, ToggleOutcome, TrashSweep, TAB_COLORS,
 };
 use crate::domain::validation;
 use crate::error::TaskError;
@@ -550,9 +550,13 @@ fn list_siblings_tx(tx: &Connection, task: &Task) -> Result<Vec<Task>, TaskError
 /// The unit is the tree, and the countdown starts at its *last* closure. Taking
 /// every task by its own timestamp was how a tree parted with open work: a
 /// parent closed weeks ago carried off a subtask nobody had finished, quietly.
-pub fn purge_completed_tasks(conn: &mut Connection, days: i64) -> Result<Vec<Task>, TaskError> {
+pub fn purge_completed_tasks(
+    conn: &mut Connection,
+    days: i64,
+    limit: i64,
+) -> Result<TrashSweep, TaskError> {
     if days <= 0 {
-        return Ok(Vec::new());
+        return Ok(TrashSweep::empty());
     }
     let tx = conn.transaction()?;
 
@@ -599,7 +603,13 @@ pub fn purge_completed_tasks(conn: &mut Connection, days: i64) -> Result<Vec<Tas
         )?;
     }
     tx.commit()?;
-    Ok(moved)
+    // The trash limit is enforced here rather than in the caller: a rule that
+    // only holds when every caller remembers it is not a rule. A timer that
+    // arrives with thirty finished tasks would otherwise push the bin past its
+    // bound and take the next manual deletion's eviction away from whoever it
+    // belongs to.
+    let evicted = trim_trash(conn, limit)?;
+    Ok(TrashSweep { moved, evicted })
 }
 
 /// Permanently removes a soft-deleted task (and its subtasks).
@@ -1453,7 +1463,11 @@ pub fn delete_tab(conn: &mut Connection, id: &str) -> Result<TabDeletion, TaskEr
 /// they went, a tree deleted one row at a time would land in the trash with a
 /// spread of dates, and every one of them would start its own trash-retention
 /// term on a different day.
-pub fn finalize_tab_deletion(conn: &mut Connection, tab_id: &str) -> Result<Vec<Task>, TaskError> {
+pub fn finalize_tab_deletion(
+    conn: &mut Connection,
+    tab_id: &str,
+    limit: i64,
+) -> Result<TrashSweep, TaskError> {
     let mut conn_tx = conn.transaction()?;
     let tx = &mut conn_tx;
 
@@ -1479,7 +1493,10 @@ pub fn finalize_tab_deletion(conn: &mut Connection, tab_id: &str) -> Result<Vec<
         .map(|id| get_task_row(tx, id, true))
         .collect::<Result<Vec<_>, _>>()?;
     conn_tx.commit()?;
-    Ok(moved)
+    // A whole tab arriving at once is the fastest way past the bound, so this
+    // path enforces it for the same reason as a deletion by hand.
+    let evicted = trim_trash(conn, limit)?;
+    Ok(TrashSweep { moved, evicted })
 }
 
 /// Finishes tab deletions whose undo window was cut short by the app closing.
@@ -1487,18 +1504,27 @@ pub fn finalize_tab_deletion(conn: &mut Connection, tab_id: &str) -> Result<Vec<
 /// Without this a tab hidden ten seconds before quitting would stay hidden for
 /// ever with its tasks still in place — a tab nobody can see and nobody asked to
 /// keep. Called once at startup, before the first render.
-pub fn sweep_pending_tab_deletions(conn: &mut Connection) -> Result<Vec<Task>, TaskError> {
+pub fn sweep_pending_tab_deletions(
+    conn: &mut Connection,
+    limit: i64,
+) -> Result<TrashSweep, TaskError> {
     let pending: Vec<String> = {
         let mut stmt = conn.prepare("SELECT id FROM tabs WHERE deleted_at IS NOT NULL")?;
         let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
         rows.collect::<Result<Vec<_>, _>>()?
     };
+    if pending.is_empty() {
+        return Ok(TrashSweep::empty());
+    }
 
     let mut moved: Vec<Task> = Vec::new();
+    let mut evicted: Vec<Task> = Vec::new();
     for tab_id in pending {
-        moved.extend(finalize_tab_deletion(conn, &tab_id)?);
+        let sweep = finalize_tab_deletion(conn, &tab_id, limit)?;
+        moved.extend(sweep.moved);
+        evicted.extend(sweep.evicted);
     }
-    Ok(moved)
+    Ok(TrashSweep { moved, evicted })
 }
 
 /// Takes back a tab deletion: the tab reappears with its tasks untouched.

@@ -711,7 +711,7 @@ fn the_export_keeps_a_deleted_tab_and_its_tasks() {
     repository::delete_tab(&mut conn, &work.id).unwrap();
     // The undo window passed, so the tasks left with the tab: the snapshot has
     // to carry the picture *after* the deletion, not midway through it.
-    repository::finalize_tab_deletion(&mut conn, &work.id).unwrap();
+    repository::finalize_tab_deletion(&mut conn, &work.id, 200).unwrap();
 
     let exported = repository::list_tabs_including_deleted(&conn).unwrap();
     assert!(
@@ -1035,7 +1035,9 @@ fn purge_moves_a_finished_tree_to_the_trash() {
     )
     .unwrap();
 
-    let moved = repository::purge_completed_tasks(&mut conn, 30).unwrap();
+    let moved = repository::purge_completed_tasks(&mut conn, 30, 200)
+        .unwrap()
+        .moved;
     assert_eq!(moved.len(), 3, "родитель уходит вместе с подзадачами");
     assert_eq!(moved[0].id, root.id, "родитель идёт первым");
 
@@ -1056,8 +1058,9 @@ fn purge_moves_a_finished_tree_to_the_trash() {
     }
 
     // A non-positive retention disables the cleanup entirely.
-    assert!(repository::purge_completed_tasks(&mut conn, 0)
+    assert!(repository::purge_completed_tasks(&mut conn, 0, 200)
         .unwrap()
+        .moved
         .is_empty());
 }
 
@@ -1081,8 +1084,9 @@ fn purge_waits_for_the_last_closure_in_the_tree() {
     .unwrap();
 
     assert!(
-        repository::purge_completed_tasks(&mut conn, 30)
+        repository::purge_completed_tasks(&mut conn, 30, 200)
             .unwrap()
+            .moved
             .is_empty(),
         "отсчёт идёт от последнего завершения в дереве, а не от первого"
     );
@@ -1106,8 +1110,9 @@ fn purge_leaves_a_tree_with_open_work_alone() {
     .unwrap();
 
     assert!(
-        repository::purge_completed_tasks(&mut conn, 30)
+        repository::purge_completed_tasks(&mut conn, 30, 200)
             .unwrap()
+            .moved
             .is_empty(),
         "дерево с незавершённой подзадачей остаётся на месте"
     );
@@ -1125,8 +1130,9 @@ fn purge_leaves_a_tree_with_open_work_alone() {
     )
     .unwrap();
 
-    assert!(repository::purge_completed_tasks(&mut conn, 30)
+    assert!(repository::purge_completed_tasks(&mut conn, 30, 200)
         .unwrap()
+        .moved
         .is_empty());
 
     let titles: Vec<String> = repository::list_roots(&conn, true, None)
@@ -1394,7 +1400,9 @@ fn deleting_a_tab_hides_it_first_and_keeps_the_last_one() {
     );
 
     // The window passed: now the tab's tasks leave together, one timestamp.
-    let moved = repository::finalize_tab_deletion(&mut conn, &second.id).unwrap();
+    let moved = repository::finalize_tab_deletion(&mut conn, &second.id, 200)
+        .unwrap()
+        .moved;
     assert_eq!(moved.len(), 1);
     assert!(deleted_at_of(&conn, &task.id).is_some());
     assert_eq!(
@@ -1496,7 +1504,9 @@ fn the_window_ending_moves_the_tasks_with_one_timestamp() {
     let child = repository::create_task(&mut conn, "Под", Some(&first.id), None, true).unwrap();
 
     repository::delete_tab(&mut conn, &work.id).unwrap();
-    let moved = repository::finalize_tab_deletion(&mut conn, &work.id).unwrap();
+    let moved = repository::finalize_tab_deletion(&mut conn, &work.id, 200)
+        .unwrap()
+        .moved;
     assert_eq!(moved.len(), 3, "подзадачи уходят вместе с родителем");
 
     // One timestamp for the whole tree: a tree stamped row by row would arrive
@@ -1525,7 +1535,9 @@ fn a_tab_hidden_by_a_closed_app_is_finished_on_the_next_launch() {
     repository::delete_tab(&mut conn, &work.id).unwrap();
     assert!(deleted_at_of(&conn, &task.id).is_none());
 
-    let swept = repository::sweep_pending_tab_deletions(&mut conn).unwrap();
+    let swept = repository::sweep_pending_tab_deletions(&mut conn, 200)
+        .unwrap()
+        .moved;
     assert_eq!(swept.len(), 1);
     assert!(
         deleted_at_of(&conn, &task.id).is_some(),
@@ -1546,7 +1558,7 @@ fn the_sweep_leaves_tabs_that_are_merely_hidden_by_a_restored_task() {
     let task = repository::create_task(&mut conn, "Задача", None, Some(&work.id), true).unwrap();
 
     repository::delete_tab(&mut conn, &work.id).unwrap();
-    repository::finalize_tab_deletion(&mut conn, &work.id).unwrap();
+    repository::finalize_tab_deletion(&mut conn, &work.id, 200).unwrap();
     repository::restore_task(&mut conn, &task.id).unwrap();
     assert!(
         repository::list_tabs(&conn)
@@ -1556,7 +1568,9 @@ fn the_sweep_leaves_tabs_that_are_merely_hidden_by_a_restored_task() {
         "восстановление задачи вернуло вкладку"
     );
 
-    let swept = repository::sweep_pending_tab_deletions(&mut conn).unwrap();
+    let swept = repository::sweep_pending_tab_deletions(&mut conn, 200)
+        .unwrap()
+        .moved;
     assert!(
         swept.is_empty(),
         "подметание не должно трогать живую вкладку: {:?}",
@@ -1569,6 +1583,81 @@ fn the_sweep_leaves_tabs_that_are_merely_hidden_by_a_restored_task() {
             .len(),
         1
     );
+}
+
+#[test]
+fn the_completion_timer_pushes_the_oldest_out_when_the_trash_is_full() {
+    // The timer moves whole trees in, and it used to do it past the bound: a
+    // bound that holds only for deletions by hand is not a bound. The limit here
+    // is two, and the third task is the oldest in the bin.
+    let mut conn = open_test_db();
+    deleted_at(&mut conn, "Давно в корзине", "2024-01-01T00:00:00.000Z");
+    deleted_at(&mut conn, "Тоже давно", "2024-01-02T00:00:00.000Z");
+
+    let finished = repository::create_task(&mut conn, "Закрытая давно", None, None, true).unwrap();
+    repository::toggle_completion(&mut conn, &finished.id, true).unwrap();
+    conn.execute(
+        "UPDATE tasks SET completed_at = datetime('now', '-40 days') WHERE id = ?1",
+        [&finished.id],
+    )
+    .unwrap();
+
+    let sweep = repository::purge_completed_tasks(&mut conn, 30, 2).unwrap();
+
+    assert_eq!(sweep.moved.len(), 1, "дерево ушло в корзину");
+    assert_eq!(
+        sweep.evicted.len(),
+        1,
+        "вытеснено столько же, сколько не влезло"
+    );
+    assert_eq!(
+        repository::list_deleted_all(&conn, 50, 0).unwrap().len(),
+        2,
+        "корзина не превысила предел"
+    );
+}
+
+#[test]
+fn a_deleted_tab_pushes_the_oldest_out_when_the_trash_is_full() {
+    // A whole tab arriving at once is the fastest way past the bound, so this
+    // path enforces it too.
+    let mut conn = open_test_db();
+    let _first = repository::ensure_default_tab(&conn).unwrap();
+    deleted_at(&mut conn, "Давно в корзине", "2024-01-01T00:00:00.000Z");
+    let work = repository::create_tab(&conn, "Работа").unwrap();
+    let task =
+        repository::create_task(&mut conn, "Из вкладки", None, Some(&work.id), true).unwrap();
+
+    repository::delete_tab(&mut conn, &work.id).unwrap();
+    let sweep = repository::finalize_tab_deletion(&mut conn, &work.id, 1).unwrap();
+
+    assert_eq!(sweep.moved.len(), 1);
+    assert_eq!(
+        sweep.evicted.len(),
+        1,
+        "вытеснение объявлено, а не спрятано"
+    );
+    assert_eq!(repository::list_deleted_all(&conn, 50, 0).unwrap().len(), 1);
+    assert!(
+        deleted_at_of(&conn, &task.id).is_some(),
+        "задача вкладки осталась в корзине"
+    );
+}
+
+#[test]
+fn the_startup_sweep_pushes_the_oldest_out_when_the_trash_is_full() {
+    let mut conn = open_test_db();
+    let _first = repository::ensure_default_tab(&conn).unwrap();
+    deleted_at(&mut conn, "Давно в корзине", "2024-01-01T00:00:00.000Z");
+    let work = repository::create_tab(&conn, "Работа").unwrap();
+    repository::create_task(&mut conn, "Из вкладки", None, Some(&work.id), true).unwrap();
+    repository::delete_tab(&mut conn, &work.id).unwrap();
+
+    let sweep = repository::sweep_pending_tab_deletions(&mut conn, 1).unwrap();
+
+    assert_eq!(sweep.moved.len(), 1);
+    assert_eq!(sweep.evicted.len(), 1, "подметание тоже уважает предел");
+    assert_eq!(repository::list_deleted_all(&conn, 50, 0).unwrap().len(), 1);
 }
 
 #[test]
@@ -1612,7 +1701,7 @@ fn restoring_a_task_from_a_deleted_tab_brings_the_tab_back() {
     let task = repository::create_task(&mut conn, "Задача", None, Some(&work.id), true).unwrap();
 
     repository::delete_tab(&mut conn, &work.id).unwrap();
-    repository::finalize_tab_deletion(&mut conn, &work.id).unwrap();
+    repository::finalize_tab_deletion(&mut conn, &work.id, 200).unwrap();
     assert_eq!(repository::list_tabs(&conn).unwrap().len(), 1);
 
     repository::restore_task(&mut conn, &task.id).unwrap();
@@ -1640,7 +1729,7 @@ fn emptying_the_trash_drops_tabs_nothing_points_at() {
     repository::create_task(&mut conn, "Задача", None, Some(&work.id), true).unwrap();
 
     repository::delete_tab(&mut conn, &work.id).unwrap();
-    repository::finalize_tab_deletion(&mut conn, &work.id).unwrap();
+    repository::finalize_tab_deletion(&mut conn, &work.id, 200).unwrap();
     let rows: i64 = conn
         .query_row("SELECT COUNT(*) FROM tabs WHERE id = ?1", [&work.id], |r| {
             r.get(0)
