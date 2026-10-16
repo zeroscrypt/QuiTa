@@ -76,6 +76,15 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      # The action above installs its targets for `stable`, while the build uses
+      # the channel pinned in `rust-toolchain.toml`. Targets are installed per
+      # channel, so the Intel build came up without its target and failed at the
+      # very end with "Target x86_64-apple-darwin is not installed". Here `rustup`
+      # reads the file and resolves the channel the build will actually use.
+      - name: Install the configured build target
+        if: matrix.target != ''
+        run: rustup target add ${{ matrix.target }}
+
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           workspaces: src-tauri
