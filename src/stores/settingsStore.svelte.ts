@@ -11,6 +11,7 @@ class SettingsStore {
   showTabCounts = $state(true);
   newestFirst = $state(true);
   autoDeleteDays = $state<number | null>(null);
+  trashLimit = $state(200);
   language = $state<Language>('ru');
   loaded = $state(false);
 
@@ -24,6 +25,7 @@ class SettingsStore {
       this.showTabCounts = settings.showTabCounts ?? true;
       this.newestFirst = settings.newestFirst ?? true;
       this.autoDeleteDays = settings.autoDeleteDays ?? null;
+      this.trashLimit = settings.trashLimit ?? 200;
       this.language = settings.language ?? 'ru';
     } catch {
       // Defaults stay; the app remains usable if settings cannot be read.
@@ -78,6 +80,12 @@ class SettingsStore {
     await this.persist();
   }
 
+  /** Zero turns the size rule off; 200 is the ceiling. */
+  async setTrashLimit(limit: number): Promise<void> {
+    this.trashLimit = Math.min(200, Math.max(0, Math.trunc(limit)));
+    await this.persist();
+  }
+
   async setLanguage(language: Language): Promise<void> {
     this.language = language;
     // `setLanguage` from the i18n module already updates `<html lang>`.
@@ -102,6 +110,7 @@ class SettingsStore {
       showTabCounts: this.showTabCounts,
       newestFirst: this.newestFirst,
       autoDeleteDays: this.autoDeleteDays,
+      trashLimit: this.trashLimit,
       language: this.language,
     };
     this.persistQueue = this.persistQueue.then(async () => {

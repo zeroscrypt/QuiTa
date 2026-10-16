@@ -48,6 +48,18 @@ export interface TabDeletion {
   taskIds: TaskId[];
 }
 
+/**
+ * What a delete did: the tasks it moved to the trash, and what fell out of the
+ * trash because it was full.
+ *
+ * Both halves are reported because both are the user's business — the first is
+ * visible in the trash, the second is gone for good.
+ */
+export interface DeleteOutcome {
+  deleted: Task[];
+  evicted: Task[];
+}
+
 export interface TaskNode {
   task: Task;
   children: Task[];
@@ -71,6 +83,11 @@ export interface AppSettings {
   cascadeComplete: boolean;
   /** Completed tasks are soft-deleted after this many days (null = never). */
   autoDeleteDays: number | null;
+  /**
+   * How many soft-deleted tasks the trash keeps. Zero turns the rule off and
+   * lets the trash grow without a bound.
+   */
+  trashLimit: number;
   /** Interface language. */
   language: "ru" | "en";
   /** Subtasks are shown without being expanded by hand (default: true). */

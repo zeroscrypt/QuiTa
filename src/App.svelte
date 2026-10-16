@@ -215,6 +215,9 @@
     {#if uiStore.exportMessage}
       <div class="toast" role="status">{uiStore.exportMessage}</div>
     {/if}
+    {#if taskStore.notice}
+      <div class="toast" role="status">{taskStore.notice}</div>
+    {/if}
     {#if uiStore.importSummary}
       <div class="toast" role="status">
         {t('settings.importDone', {

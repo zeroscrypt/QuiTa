@@ -187,8 +187,10 @@ fn the_test_counts_in_the_docs_match_the_code() {
         readme_has(&readme, "модульн", ts),
         "README.ru.md does not state the TypeScript count {ts}"
     );
+    // Same reason as the TypeScript marker above: 142 Rust-теста and
+    // 137 Rust-тестов are both correct Russian, and only the stem is shared.
     assert!(
-        readme_has(&readme, "Rust-тестов", rust_total),
+        readme_has(&readme, "Rust-тест", rust_total),
         "README.ru.md does not state the Rust total {rust_total}"
     );
 }

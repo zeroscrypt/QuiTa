@@ -177,6 +177,11 @@ export const ru: Record<string, string> = {
   "settings.autoDeleteHint":
     "Завершённые задачи удаляются при следующем запуске приложения, если прошло указанное число дней. Пустое поле — не удалять.",
   "settings.autoDeleteDays": "Через сколько дней",
+  "settings.trashLimit": "Сколько задач держать в корзине",
+  "settings.trashLimitHint":
+    "Когда корзина полна, удаление новой задачи вытесняет самую старую: она удаляется навсегда вместе с подзадачами. Ноль отключает это правило.",
+  "trash.evicted": "Корзина полна: «{title}» удалена навсегда",
+  "trash.evictedMany": "Корзина полна: {count} задач удалены навсегда",
   "settings.data": "Данные",
   "settings.export": "Экспорт в JSON",
   "settings.exportDone": "Экспортировано в {path}",

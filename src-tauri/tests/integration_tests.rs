@@ -2265,6 +2265,7 @@ fn export_carries_the_whole_state_and_import_reproduces_it() {
         show_tab_counts: true,
         newest_first: false,
         auto_delete_days: Some(14),
+        trash_limit: repository::DEFAULT_TRASH_LIMIT,
         language: "en".to_string(),
     };
     repository::update_settings(&mut conn, &settings).unwrap();
@@ -2315,6 +2316,7 @@ fn importing_a_state_file_restores_tabs_hierarchy_and_settings() {
             show_tab_counts: false,
             newest_first: false,
             auto_delete_days: Some(7),
+            trash_limit: repository::DEFAULT_TRASH_LIMIT,
             language: "en".to_string(),
         },
     )
@@ -2456,4 +2458,137 @@ fn task_json(id: &str, title: &str) -> Task {
         completion_event_id: None,
         auto_completed_by: None,
     }
+}
+
+/// Sets `deleted_at` directly, so the order in the trash is unambiguous.
+///
+/// Two tasks deleted inside the same millisecond carry the same timestamp, and
+/// then the order is decided by the tie-break rather than by the rule under
+/// test — which is how a test passes for the wrong reason.
+fn backdate_deletion(conn: &Connection, id: &str, when: &str) {
+    conn.execute(
+        "UPDATE tasks SET deleted_at = ?1 WHERE id = ?2",
+        rusqlite::params![when, id],
+    )
+    .unwrap();
+}
+
+/// Deletes a root task and returns its id, with the deletion backdated.
+fn deleted_at(conn: &mut Connection, title: &str, when: &str) -> String {
+    let task = repository::create_task(conn, title, None, None, true).unwrap();
+    repository::soft_delete_task(conn, &task.id).unwrap();
+    backdate_deletion(conn, &task.id, when);
+    task.id
+}
+
+#[test]
+fn trimming_the_trash_evicts_the_oldest_and_keeps_the_rest() {
+    let mut conn = open_test_db();
+    let oldest = deleted_at(&mut conn, "Первая", "2024-01-01T00:00:00.000Z");
+    let middle = deleted_at(&mut conn, "Вторая", "2024-01-02T00:00:00.000Z");
+    let newest = deleted_at(&mut conn, "Третья", "2024-01-03T00:00:00.000Z");
+
+    let evicted = repository::trim_trash(&mut conn, 2).unwrap();
+
+    assert_eq!(evicted.len(), 1, "one task over the limit, so one goes");
+    assert_eq!(evicted[0].id, oldest, "the one deleted longest ago");
+    let left = repository::list_deleted_all(&conn, 200, 0).unwrap();
+    assert_eq!(left.len(), 2);
+    assert!(left.iter().any(|t| t.id == middle));
+    assert!(left.iter().any(|t| t.id == newest));
+}
+
+#[test]
+fn trimming_takes_the_subtree_of_every_task_it_evicts() {
+    let mut conn = open_test_db();
+    let old = repository::create_task(&mut conn, "Старый", None, None, true).unwrap();
+    let a = repository::create_task(&mut conn, "Под A", Some(&old.id), None, true).unwrap();
+    let b = repository::create_task(&mut conn, "Под B", Some(&old.id), None, true).unwrap();
+    repository::soft_delete_task(&mut conn, &old.id).unwrap();
+    for id in [&old.id, &a.id, &b.id] {
+        backdate_deletion(&conn, id, "2024-01-01T00:00:00.000Z");
+    }
+    let fresh = deleted_at(&mut conn, "Свежий", "2024-01-03T00:00:00.000Z");
+
+    let evicted = repository::trim_trash(&mut conn, 1).unwrap();
+
+    assert_eq!(evicted.len(), 3, "the parent takes both subtasks with it");
+    let left = repository::list_deleted_all(&conn, 200, 0).unwrap();
+    assert_eq!(
+        left.len(),
+        1,
+        "no subtask is left behind without its parent"
+    );
+    assert_eq!(left[0].id, fresh);
+}
+
+#[test]
+fn trimming_leaves_exactly_the_limit_and_takes_no_more() {
+    let mut conn = open_test_db();
+    let ids: Vec<String> = (1..=5)
+        .map(|day| {
+            deleted_at(
+                &mut conn,
+                &format!("Задача {day}"),
+                &format!("2024-01-0{day}T00:00:00.000Z"),
+            )
+        })
+        .collect();
+
+    let evicted = repository::trim_trash(&mut conn, 3).unwrap();
+
+    assert_eq!(evicted.len(), 2);
+    // The returned order follows the trash itself — newest first — so the
+    // oldest task comes back last. The set is what the rule is about.
+    let mut evicted_ids: Vec<String> = evicted.iter().map(|task| task.id.clone()).collect();
+    evicted_ids.sort();
+    let mut expected = vec![ids[0].clone(), ids[1].clone()];
+    expected.sort();
+    assert_eq!(evicted_ids, expected, "the two deleted longest ago");
+    assert_eq!(
+        repository::list_deleted_all(&conn, 200, 0).unwrap().len(),
+        3
+    );
+}
+
+#[test]
+fn a_limit_of_zero_turns_the_size_rule_off() {
+    let mut conn = open_test_db();
+    for day in 1..=4 {
+        deleted_at(
+            &mut conn,
+            &format!("Задача {day}"),
+            &format!("2024-01-0{day}T00:00:00.000Z"),
+        );
+    }
+
+    let evicted = repository::trim_trash(&mut conn, 0).unwrap();
+
+    assert!(
+        evicted.is_empty(),
+        "zero declines the rule, it does not empty the trash"
+    );
+    assert_eq!(
+        repository::list_deleted_all(&conn, 200, 0).unwrap().len(),
+        4
+    );
+}
+
+#[test]
+fn the_trash_limit_is_stored_and_clamped_to_its_range() {
+    let mut conn = open_test_db();
+    assert_eq!(repository::get_settings(&conn).unwrap().trash_limit, 200);
+
+    let mut settings = repository::get_settings(&conn).unwrap();
+    settings.trash_limit = 50;
+    repository::update_settings(&mut conn, &settings).unwrap();
+    assert_eq!(repository::get_settings(&conn).unwrap().trash_limit, 50);
+
+    settings.trash_limit = -5;
+    repository::update_settings(&mut conn, &settings).unwrap();
+    assert_eq!(repository::get_settings(&conn).unwrap().trash_limit, 0);
+
+    settings.trash_limit = 9999;
+    repository::update_settings(&mut conn, &settings).unwrap();
+    assert_eq!(repository::get_settings(&conn).unwrap().trash_limit, 200);
 }

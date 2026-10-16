@@ -133,6 +133,9 @@ pub struct AppSettings {
     /// When set, completed tasks are soft-deleted after this many days.
     /// `None` disables the automatic cleanup.
     pub auto_delete_days: Option<i64>,
+    /// How many soft-deleted tasks the trash keeps. Once it is full, deleting
+    /// anything pushes the oldest task out for good.
+    pub trash_limit: i64,
     /// Interface language: "ru" | "en".
     pub language: String,
     /// When true, every task with subtasks shows them without being expanded
@@ -152,6 +155,7 @@ impl Default for AppSettings {
             show_completed: false,
             cascade_complete: true,
             auto_delete_days: None,
+            trash_limit: crate::db::repository::DEFAULT_TRASH_LIMIT,
             language: "ru".to_string(),
             expand_subtasks: true,
             show_tab_counts: true,
@@ -287,6 +291,7 @@ mod tests {
             show_completed: true,
             cascade_complete: false,
             auto_delete_days: Some(30),
+            trash_limit: 50,
             language: "en".to_string(),
             expand_subtasks: true,
             show_tab_counts: true,
@@ -296,11 +301,16 @@ mod tests {
         assert!(json.contains("\"showCompleted\":true"), "{json}");
         assert!(json.contains("\"cascadeComplete\":false"), "{json}");
         assert!(json.contains("\"autoDeleteDays\":30"), "{json}");
+        assert!(
+            json.contains("\"trashLimit\":50"),
+            "the trash size rule crosses the bridge under this name: {json}"
+        );
         assert!(json.contains("\"language\":\"en\""), "{json}");
         let parsed: AppSettings = serde_json::from_str(&json).unwrap();
         assert!(parsed.show_completed);
         assert!(!parsed.cascade_complete);
         assert_eq!(parsed.auto_delete_days, Some(30));
+        assert_eq!(parsed.trash_limit, 50);
         assert_eq!(parsed.language, "en");
     }
 
