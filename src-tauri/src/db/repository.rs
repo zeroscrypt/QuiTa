@@ -543,66 +543,63 @@ fn list_siblings_tx(tx: &Connection, task: &Task) -> Result<Vec<Task>, TaskError
     Ok(tasks)
 }
 
-/// Soft-deletes completed tasks that were completed more than `days` ago,
-/// together with their subtasks. Runs on startup / list refresh, so no
-/// background timer is needed. Returns the removed tasks.
+/// Moves finished trees to the trash once the work in them has been closed for
+/// `days`. Runs on startup / list refresh, so no background timer is needed.
+/// Returns the moved tasks, parent first.
+///
+/// The unit is the tree, and the countdown starts at its *last* closure. Taking
+/// every task by its own timestamp was how a tree parted with open work: a
+/// parent closed weeks ago carried off a subtask nobody had finished, quietly.
 pub fn purge_completed_tasks(conn: &mut Connection, days: i64) -> Result<Vec<Task>, TaskError> {
     if days <= 0 {
         return Ok(Vec::new());
     }
     let tx = conn.transaction()?;
 
-    let mut stmt = tx.prepare(&format!(
-        "SELECT {TASK_COLUMNS}
-         FROM tasks
-         WHERE deleted_at IS NULL
-           AND completed_at IS NOT NULL
-           AND datetime(completed_at) < datetime('now', ?1)"
-    ))?;
-    let expired: Vec<Task> = stmt
-        .query_map([format!("-{days} days")], |row| {
-            Ok(Task {
-                id: row.get("id")?,
-                parent_id: row.get("parent_id")?,
-                tab_id: row.get("tab_id")?,
-                title: row.get("title")?,
-                created_at: row.get("created_at")?,
-                updated_at: row.get("updated_at")?,
-                completed_at: row.get("completed_at")?,
-                deleted_at: row.get("deleted_at")?,
-                due_date: row.get("due_date")?,
-                comment: row.get("comment")?,
-                sort_order: row.get("sort_order")?,
-                completion_event_id: row.get("completion_event_id")?,
-                auto_completed_by: row.get("auto_completed_by")?,
-            })
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
-    drop(stmt);
-
-    // Deleting a parent takes its subtasks with it (cascade), so collect them.
-    let mut to_delete: Vec<Task> = Vec::new();
-    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    for task in &expired {
-        if seen.insert(task.id.clone()) {
-            to_delete.push(task.clone());
-        }
-        for child in list_subtasks(&tx, &task.id)? {
-            if seen.insert(child.id.clone()) {
-                to_delete.push(child);
-            }
-        }
-    }
+    // Both halves of the rule sit in one query on purpose. Walking candidate
+    // parents in Rust and then asking about their children would leave a gap
+    // between the two lookups — and a subtask reopened inside that gap would be
+    // carried off by the very check written to protect it.
+    let due: Vec<Task> = {
+        let mut stmt = tx.prepare(&format!(
+            "SELECT {TASK_COLUMNS}
+             FROM tasks AS root
+             WHERE root.parent_id IS NULL
+               AND root.deleted_at IS NULL
+               AND root.completed_at IS NOT NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM tasks AS open
+                   WHERE open.deleted_at IS NULL
+                     AND open.completed_at IS NULL
+                     AND (open.id = root.id OR open.parent_id = root.id)
+               )
+               AND datetime((
+                   SELECT MAX(closed.completed_at) FROM tasks AS closed
+                   WHERE closed.deleted_at IS NULL
+                     AND (closed.id = root.id OR closed.parent_id = root.id)
+               )) < datetime('now', ?1)"
+        ))?;
+        let rows = stmt
+            .query_map([format!("-{days} days")], row_to_task)?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows
+    };
 
     let now = now_rfc3339();
-    for task in &to_delete {
+    let mut moved: Vec<Task> = Vec::new();
+    for root in due {
+        let children = list_subtasks_tx(&tx, &root.id)?;
+        moved.push(root);
+        moved.extend(children);
+    }
+    for task in &moved {
         tx.execute(
             "UPDATE tasks SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2",
             rusqlite::params![now, task.id],
         )?;
     }
     tx.commit()?;
-    Ok(to_delete)
+    Ok(moved)
 }
 
 /// Permanently removes a soft-deleted task (and its subtasks).
