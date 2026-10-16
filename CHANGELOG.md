@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.0](https://github.com/zeroscrypt/QuiTa/compare/v1.2.2...v1.3.0) (2026-10-16)
+
+
+### Новое
+
+* **корзина:** срок хранения — отдельная настройка, по умолчанию выключенная ([#26](https://github.com/zeroscrypt/QuiTa/issues/26)) ([a0dd471](https://github.com/zeroscrypt/QuiTa/commit/a0dd47190c5804fff89e47658ec26286fb0acd91))
+
+
+### Исправлено
+
+* **корзина:** таймер завершённых больше не уносит незавершённую работу ([#23](https://github.com/zeroscrypt/QuiTa/issues/23)) ([ab3c305](https://github.com/zeroscrypt/QuiTa/commit/ab3c30503e433fc69c49bab7ecddb1d6514d8e12))
+
 ## [1.2.2](https://github.com/zeroscrypt/QuiTa/compare/v1.2.1...v1.2.2) (2026-10-16)
 
 
