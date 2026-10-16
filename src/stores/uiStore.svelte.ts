@@ -63,7 +63,7 @@ type PendingUndo =
 
 const UNDO_SECONDS = 10;
 
-class UiStore {
+export class UiStore {
   settingsOpen = $state(false);
   aboutOpen = $state(false);
   confirmDelete = $state<ConfirmDeleteState | null>(null);
@@ -213,6 +213,51 @@ class UiStore {
     this.unlistenAbout = await listen("quita:about", () => {
       this.aboutOpen = true;
     });
+  }
+
+  /**
+   * Dismissable layers, innermost last.
+   *
+   * Escape used to be handled by each overlay on its own document listener,
+   * which meant one press closed everything that happened to be open: a date
+   * picker, the comment behind it and the menu that opened the picker all
+   * reacted to the same keystroke. Escape has to unwind one layer per press,
+   * and the only way to know which layer is innermost is to keep them in order
+   * somewhere central.
+   *
+   * Layers register on mount and drop out on destroy. Overlays sit behind an
+   * `{#if}`, so mounting *is* opening — no extra bookkeeping at the call site.
+   */
+  #layers: { name: string; close: () => void }[] = [];
+
+  /** Registers a layer and returns the function that takes it back out. */
+  openLayer(name: string, close: () => void): () => void {
+    const layer = { name, close };
+    this.#layers.push(layer);
+    // Removal is by identity rather than by name: a popover that reopens can
+    // briefly hold two layers of the same name, and tearing down the older one
+    // must not silently unregister the newer one.
+    return () => {
+      const at = this.#layers.indexOf(layer);
+      if (at !== -1) this.#layers.splice(at, 1);
+    };
+  }
+
+  /**
+   * Closes the topmost layer. The entry is taken off the stack before `close`
+   * runs, so a layer that closes without unmounting at once cannot be closed
+   * twice by the next press.
+   */
+  dismissTopmost(): boolean {
+    const top = this.#layers.pop();
+    if (!top) return false;
+    top.close();
+    return true;
+  }
+
+  /** How many layers are open. Used by the input and by tests. */
+  get layerCount(): number {
+    return this.#layers.length;
   }
 
   /** Puts the caret in the task input so a task can be typed at once. */

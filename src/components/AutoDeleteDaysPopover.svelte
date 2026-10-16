@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { settingsStore } from '$stores/settingsStore.svelte';
+  import { uiStore } from '$stores/uiStore.svelte';
   import { t } from '$i18n';
 
   let {
@@ -26,14 +27,12 @@
     function onDocumentClick(event: MouseEvent) {
       if (popoverEl && !popoverEl.contains(event.target as Node)) onClose();
     }
-    function onKeydown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
-    }
+    // Escape belongs to App.svelte, which unwinds one layer per press.
+    const leaveLayer = uiStore.openLayer('auto-delete-days', onClose);
     document.addEventListener('mousedown', onDocumentClick);
-    document.addEventListener('keydown', onKeydown);
     return () => {
+      leaveLayer();
       document.removeEventListener('mousedown', onDocumentClick);
-      document.removeEventListener('keydown', onKeydown);
     };
   });
 

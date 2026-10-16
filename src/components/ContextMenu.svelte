@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import type { Item } from '$lib/menuTypes';
+  import { uiStore } from '$stores/uiStore.svelte';
 
   let {
     items,
@@ -27,11 +28,11 @@
     function onDocumentClick(event: MouseEvent) {
       if (menuEl && !menuEl.contains(event.target as Node)) onClose();
     }
+    // Registering on mount is what puts Escape handling in order: the menu sits
+    // above the row and the popovers it opened, so it has to unwind first.
+    const leaveLayer = uiStore.openLayer('context-menu', onClose);
     function onKeydown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        onClose();
-        return;
-      }
+      if (event.key === 'Escape') return;
       // Arrow keys move between items, which is what `role="menu"` promises.
       // Without this the menu was reachable only by mouse: a keyboard user
       // could not reorder a task, toggle auto-delete, or delete it at all.
@@ -49,6 +50,7 @@
     document.addEventListener('mousedown', onDocumentClick);
     document.addEventListener('keydown', onKeydown);
     return () => {
+      leaveLayer();
       document.removeEventListener('mousedown', onDocumentClick);
       document.removeEventListener('keydown', onKeydown);
     };

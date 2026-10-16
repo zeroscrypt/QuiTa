@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { t } from '$i18n';
+  import { uiStore } from '$stores/uiStore.svelte';
   import { appStore } from '$stores/appStore.svelte';
 
   let {
@@ -56,15 +57,15 @@
     function onPointerDown(event: MouseEvent) {
       if (popoverEl && !popoverEl.contains(event.target as Node)) close();
     }
-    function onKeydown(event: KeyboardEvent) {
-      if (event.key === 'Escape') close();
-    }
+    // Escape is App.svelte's job: one handler there unwinds one layer per
+    // press, and a second listener here would close two at once.
+    // Mounting is opening, so this is where the layer enters the stack.
+    const leaveLayer = uiStore.openLayer('comment', close);
     document.addEventListener('mousedown', onPointerDown);
-    document.addEventListener('keydown', onKeydown);
     return () => {
+      leaveLayer();
       if (saveTimer !== null) clearTimeout(saveTimer);
       document.removeEventListener('mousedown', onPointerDown);
-      document.removeEventListener('keydown', onKeydown);
     };
   });
 

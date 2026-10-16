@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
+  import { uiStore } from '$stores/uiStore.svelte';
   import {
     isValidDueDate,
     localDateStringAfterDays,
@@ -28,8 +29,13 @@
   let current = $state(untrack(() => value ?? todayLocalDateString()));
   let pos = $state(untrack(() => ({ left: anchor.right, top: anchor.bottom + 4 })));
 
-  $effect(() => {
+  onMount(() => {
     inputEl?.focus();
+    // Escape is handled centrally; this only puts the layer in the order.
+    return uiStore.openLayer('due-date', onClose);
+  });
+
+  $effect(() => {
     function onDocumentClick(event: MouseEvent) {
       if (popoverEl && !popoverEl.contains(event.target as Node)) onClose();
     }

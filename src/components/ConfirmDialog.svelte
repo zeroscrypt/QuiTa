@@ -24,6 +24,16 @@
     if (deleteState || tabState) confirmBtn?.focus();
   });
 
+  // Escape has to reach this dialog: it is the one asking before destroying
+  // something, so refusing it is never the right reading of "cancel".
+  $effect(() => {
+    if (!deleteState && !tabState) return;
+    return uiStore.openLayer('confirm', () => {
+      uiStore.cancelDelete();
+      uiStore.cancelTabDelete();
+    });
+  });
+
   async function confirm() {
     if (busy) return;
     const task = deleteState;

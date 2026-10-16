@@ -44,6 +44,25 @@
   const searching = $derived(taskStore.searchQuery.trim().length > 0);
 
   /**
+   * Escape closes the topmost layer — one layer per press, never all of them.
+   * The overlays themselves used to listen on `document` and each one reacted
+   * independently, so a single press could take down a date picker, the comment
+   * behind it and the menu that opened them together.
+   *
+   * When the last layer is gone the caret goes to the task input, which is where
+   * the user was heading all along. With nothing open at all, Escape falls
+   * through to the input's own behaviour of clearing the field.
+   */
+  function onEscape(event: KeyboardEvent) {
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
+    if (!uiStore.dismissTopmost()) return;
+    event.preventDefault();
+    // A queue, not a direct call: closing the layer unmounts the component
+    // that may be about to own the focus, so the next one runs after that.
+    void tick().then(() => uiStore.requestFocusInput());
+  }
+
+  /**
    * ⌘1..9 on macOS, Ctrl+1..9 elsewhere — the binding every app with tabs
    * already uses, so nobody has to look it up. Both modifiers are accepted on
    * every platform: they collide with nothing here, and branching on the
@@ -55,7 +74,8 @@
    * switch tabs in an app that is not in front.
    */
   function onWindowKeydown(event: KeyboardEvent) {
-    if (!isTabShortcut(event)) return;
+    onEscape(event);
+    if (event.defaultPrevented || !isTabShortcut(event)) return;
     // A dialog owns the keyboard while it is open.
     if (
       uiStore.settingsOpen ||

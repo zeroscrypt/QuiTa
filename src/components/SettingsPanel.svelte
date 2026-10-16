@@ -33,11 +33,10 @@
     void taskStore.loadDeleted();
     void dbStore.refresh();
     void appStore.load();
-    function onKeydown(event: KeyboardEvent) {
-      if (event.key === 'Escape') uiStore.settingsOpen = false;
-    }
-    document.addEventListener('keydown', onKeydown);
-    return () => document.removeEventListener('keydown', onKeydown);
+    // Registering on mount keeps the panel below the dialogs that open above
+    // it. Its own Escape listener used to close the entire panel even when a
+    // confirmation was sitting on top of it.
+    return uiStore.openLayer('settings', () => (uiStore.settingsOpen = false));
   });
 
   const deleted = $derived(taskStore.deleted);
