@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/zeroscrypt/QuiTa/compare/v1.3.1...v1.3.2) (2026-10-16)
+
+
+### Исправлено
+
+* **корзина:** предел держится на каждом пути в корзину, а не на одном ([#29](https://github.com/zeroscrypt/QuiTa/issues/29)) ([b9bb8ae](https://github.com/zeroscrypt/QuiTa/commit/b9bb8ae5402643d5a7489783ded4dd6707908194))
+
 ## [1.3.1](https://github.com/zeroscrypt/QuiTa/compare/v1.3.0...v1.3.1) (2026-10-16)
 
 
