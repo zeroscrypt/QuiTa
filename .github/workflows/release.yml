@@ -257,6 +257,11 @@ jobs:
             --limit 50 --json number,title \
             --jq '.[] | select(.title | test("release [0-9]+\\.[0-9]+\\.[0-9]+")) | "\(.number) \(.title | capture("release (?<v>[0-9]+\\.[0-9]+\\.[0-9]+)").v)"')
 
+          # Printed even when it is empty. A check that prints nothing on the
+          # way through cannot be told apart from one that never looked, and
+          # this half is exactly the one that was silently missing.
+          echo "release pull requests still pending:${stale:- none}"
+
           if [ -n "$stale" ]; then
             echo "::error::release pull request(s)$stale still carry the pending label while the manifest says $promised. They were never released by Release Please, and every run retries them instead of releasing anything new. Tell it they are done: gh pr edit <number> --remove-label 'autorelease: pending' --add-label 'autorelease: tagged'"
             exit 1
