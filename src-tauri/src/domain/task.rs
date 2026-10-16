@@ -136,6 +136,9 @@ pub struct AppSettings {
     /// How many soft-deleted tasks the trash keeps. Once it is full, deleting
     /// anything pushes the oldest task out for good.
     pub trash_limit: i64,
+    /// When set, trees that have sat in the trash this many days are removed for
+    /// good on the next launch. `None` keeps them until the user says otherwise.
+    pub trash_retention_days: Option<i64>,
     /// Interface language: "ru" | "en".
     pub language: String,
     /// When true, every task with subtasks shows them without being expanded
@@ -156,6 +159,7 @@ impl Default for AppSettings {
             cascade_complete: true,
             auto_delete_days: None,
             trash_limit: crate::db::repository::DEFAULT_TRASH_LIMIT,
+            trash_retention_days: None,
             language: "ru".to_string(),
             expand_subtasks: true,
             show_tab_counts: true,
@@ -292,6 +296,7 @@ mod tests {
             cascade_complete: false,
             auto_delete_days: Some(30),
             trash_limit: 50,
+            trash_retention_days: Some(90),
             language: "en".to_string(),
             expand_subtasks: true,
             show_tab_counts: true,

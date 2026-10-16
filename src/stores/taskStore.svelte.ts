@@ -58,13 +58,14 @@ class TaskStore {
   private unlistenShortcut: UnlistenFn | null = null;
 
   async init(): Promise<void> {
-    // Apply the retention policy before the first render so the list is correct.
-    if (settingsStore.autoDeleteDays !== null) {
-      try {
-        await taskService.purgeCompletedTasks();
-      } catch (e) {
-        this.showError(e);
-      }
+    // Apply the retention policies before the first render so the list is
+    // correct. Both are read by the command itself, which does nothing while
+    // the setting is empty.
+    try {
+      await taskService.purgeCompletedTasks();
+      await taskService.purgeTrashByAge();
+    } catch (e) {
+      this.showError(e);
     }
     await this.load();
     // The Rust layer emits this when the global shortcut fires; the UI then

@@ -231,6 +231,7 @@ open, `Esc` clears the field, as it always did.
 
 - [x] **A task goes to the bin together with its subtasks.** A parent cannot stay behind without them: they would hang in lists where nothing shows them.
 - [x] **The bin keeps 200 tasks** — the number is yours to set, and zero turns the rule off. When it is full, deleting another task pushes the oldest out for good, subtasks included, and the rest shift up.
+- [x] **How long it keeps them is a separate setting** — off by default, because nothing may be deleted on its own. Turn it on and a tree that has sat there that many days leaves on the next launch. The countdown starts at the last deletion in the tree, so a subtask thrown out after its parent gets its full term.
 - [x] **Displacement is announced.** That task did not go by your choice, so the toast names the one that left.
 - [x] **The header shows the real number**, not what fits on screen; the rest comes with "Show more".
 
@@ -299,8 +300,8 @@ therefore testable without a window.
 | `pnpm tauri dev` | Run with hot reload |
 | `pnpm tauri build` | Installers for the current platform |
 | `pnpm check` | Svelte and TypeScript types |
-| `pnpm test` | 147 unit tests |
-| `cargo test --manifest-path src-tauri/Cargo.toml` | 144 Rust tests (40 unit + 100 integration against a real database + 4 guarding the docs) |
+| `pnpm test` | 152 unit tests |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | 149 Rust tests (40 unit + 105 integration against a real database + 4 guarding the docs) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Lints, errors as warnings |
 | `cargo audit` | Vulnerabilities in dependencies |
 

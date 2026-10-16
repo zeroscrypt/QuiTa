@@ -1140,6 +1140,142 @@ fn purge_leaves_a_tree_with_open_work_alone() {
 }
 
 #[test]
+fn purge_trash_by_age_removes_an_expired_tree() {
+    let mut conn = open_test_db();
+    let root = repository::create_task(&mut conn, "В корзине", None, None, true).unwrap();
+    let child =
+        repository::create_task(&mut conn, "Её подзадача", Some(&root.id), None, true).unwrap();
+    let fresh = repository::create_task(&mut conn, "Свежая", None, None, true).unwrap();
+    repository::soft_delete_task(&mut conn, &root.id).unwrap();
+    repository::soft_delete_task(&mut conn, &fresh.id).unwrap();
+
+    conn.execute(
+        "UPDATE tasks SET deleted_at = datetime('now', '-40 days')
+         WHERE id = ?1 OR parent_id = ?1",
+        [&root.id],
+    )
+    .unwrap();
+
+    let removed = repository::purge_trash_by_age(&mut conn, 30).unwrap();
+    assert_eq!(removed.len(), 2, "дерево уходит целиком, родитель первым");
+    assert_eq!(removed[0].id, root.id);
+
+    // For good: the rows are gone, not unflagged. A task still sitting in the
+    // trash would be one the user could "restore" out of nowhere.
+    for id in [&root.id, &child.id] {
+        let left: i64 = conn
+            .query_row("SELECT COUNT(*) FROM tasks WHERE id = ?1", [id], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(left, 0, "{id} должен быть удалён из базы совсем");
+    }
+    assert_eq!(repository::list_deleted_all(&conn, 50, 0).unwrap().len(), 1);
+}
+
+#[test]
+fn purge_trash_by_age_waits_for_the_latest_deletion_in_the_tree() {
+    let mut conn = open_test_db();
+    let root = repository::create_task(&mut conn, "Родитель", None, None, true).unwrap();
+    let child = repository::create_task(&mut conn, "Поздняя", Some(&root.id), None, true).unwrap();
+    repository::soft_delete_task(&mut conn, &root.id).unwrap();
+
+    // The parent went to the trash long ago, the subtree joined it two days ago.
+    conn.execute(
+        "UPDATE tasks SET deleted_at = datetime('now', '-40 days') WHERE id = ?1",
+        [&root.id],
+    )
+    .unwrap();
+    conn.execute(
+        "UPDATE tasks SET deleted_at = datetime('now', '-2 days') WHERE id = ?1",
+        [&child.id],
+    )
+    .unwrap();
+
+    assert!(
+        repository::purge_trash_by_age(&mut conn, 30)
+            .unwrap()
+            .is_empty(),
+        "отсчёт идёт от последнего попадания в корзину, а не от первого"
+    );
+    assert_eq!(repository::list_deleted_all(&conn, 50, 0).unwrap().len(), 2);
+}
+
+#[test]
+fn purge_trash_by_age_treats_a_deleted_subtask_on_its_own_as_its_own_unit() {
+    let mut conn = open_test_db();
+    let root = repository::create_task(&mut conn, "Живой родитель", None, None, true).unwrap();
+    let child =
+        repository::create_task(&mut conn, "Выброшенная", Some(&root.id), None, true).unwrap();
+    repository::soft_delete_task(&mut conn, &child.id).unwrap();
+    conn.execute(
+        "UPDATE tasks SET deleted_at = datetime('now', '-40 days') WHERE id = ?1",
+        [&child.id],
+    )
+    .unwrap();
+
+    let removed = repository::purge_trash_by_age(&mut conn, 30).unwrap();
+    assert_eq!(removed.len(), 1);
+    assert_eq!(removed[0].id, child.id);
+    assert!(
+        active_task(&conn, &root.id).title == "Живой родитель",
+        "подзадача уходит сама, родитель из этого не вытекается"
+    );
+}
+
+#[test]
+fn purge_trash_by_age_is_off_until_it_is_asked_for() {
+    let mut conn = open_test_db();
+    let task = repository::create_task(&mut conn, "Старая", None, None, true).unwrap();
+    repository::soft_delete_task(&mut conn, &task.id).unwrap();
+    conn.execute(
+        "UPDATE tasks SET deleted_at = datetime('now', '-400 days') WHERE id = ?1",
+        [&task.id],
+    )
+    .unwrap();
+
+    // The setting is empty out of the box: a retention nobody chose must not
+    // delete anything on its own.
+    assert_eq!(
+        repository::get_settings(&conn)
+            .unwrap()
+            .trash_retention_days,
+        None
+    );
+    assert!(repository::purge_trash_by_age(&mut conn, 0)
+        .unwrap()
+        .is_empty());
+    assert!(repository::purge_trash_by_age(&mut conn, -1)
+        .unwrap()
+        .is_empty());
+    assert_eq!(repository::list_deleted_all(&conn, 50, 0).unwrap().len(), 1);
+}
+
+#[test]
+fn the_trash_retention_is_stored_and_cleared_again() {
+    let mut conn = open_test_db();
+    let mut settings = repository::get_settings(&conn).unwrap();
+
+    settings.trash_retention_days = Some(90);
+    repository::update_settings(&mut conn, &settings).unwrap();
+    assert_eq!(
+        repository::get_settings(&conn)
+            .unwrap()
+            .trash_retention_days,
+        Some(90)
+    );
+
+    settings.trash_retention_days = None;
+    repository::update_settings(&mut conn, &settings).unwrap();
+    assert_eq!(
+        repository::get_settings(&conn)
+            .unwrap()
+            .trash_retention_days,
+        None
+    );
+}
+
+#[test]
 fn tasks_created_before_tabs_are_adopted_by_the_first_tab() {
     // Simulate a database upgraded from migration v1: tasks with NULL tab_id.
     let conn = Connection::open_in_memory().unwrap();
@@ -2342,6 +2478,7 @@ fn export_carries_the_whole_state_and_import_reproduces_it() {
         newest_first: false,
         auto_delete_days: Some(14),
         trash_limit: repository::DEFAULT_TRASH_LIMIT,
+        trash_retention_days: None,
         language: "en".to_string(),
     };
     repository::update_settings(&mut conn, &settings).unwrap();
@@ -2393,6 +2530,7 @@ fn importing_a_state_file_restores_tabs_hierarchy_and_settings() {
             newest_first: false,
             auto_delete_days: Some(7),
             trash_limit: repository::DEFAULT_TRASH_LIMIT,
+            trash_retention_days: None,
             language: "en".to_string(),
         },
     )

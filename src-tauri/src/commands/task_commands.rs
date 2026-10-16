@@ -155,6 +155,21 @@ pub async fn purge_completed_tasks(
     repository::purge_completed_tasks(&mut conn, days)
 }
 
+/// Removes what has been sitting in the trash longer than the configured
+/// retention period, for good. Runs when the UI loads, so no background timer
+/// is required, and the setting is empty until the user asks for it.
+#[tauri::command]
+pub async fn purge_trash_by_age(
+    db: State<'_, Db>,
+) -> Result<Vec<crate::domain::task::Task>, TaskError> {
+    let mut conn = db.lock().map_err(TaskError::Internal)?;
+    let settings = repository::get_settings(&conn)?;
+    let Some(days) = settings.trash_retention_days else {
+        return Ok(Vec::new());
+    };
+    repository::purge_trash_by_age(&mut conn, days)
+}
+
 /// One window of the trash, together with the total it is a window of.
 ///
 /// The total is not a convenience: the header has to say how many tasks are

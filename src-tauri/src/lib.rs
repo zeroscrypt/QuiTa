@@ -89,6 +89,7 @@ pub fn run() {
             commands::task_commands::list_subtasks,
             commands::task_commands::count_subtasks,
             commands::task_commands::purge_completed_tasks,
+            commands::task_commands::purge_trash_by_age,
             commands::task_commands::search_tasks,
             commands::settings_commands::get_settings,
             commands::settings_commands::update_settings,

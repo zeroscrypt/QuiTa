@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { uiStore } from '$stores/uiStore.svelte';
   import { settingsStore } from '$stores/settingsStore.svelte';
-  import { buildDeletedHierarchy, type DeletedNode } from '$lib/trash';
+  import { buildDeletedHierarchy, retentionVerdict, type DeletedNode } from '$lib/trash';
   import { taskStore } from '$stores/taskStore.svelte';
   import { tabStore } from '$stores/tabStore.svelte';
   import { dbStore } from '$stores/dbStore.svelte';
@@ -40,25 +40,20 @@
   });
 
   const deleted = $derived(taskStore.deleted);
-  const autoDeleteDays = $derived(settingsStore.autoDeleteDays);
+  const trashRetentionDays = $derived(settingsStore.trashRetentionDays);
   const shortcutLabel = $derived(appStore.info?.shortcut ?? '');
 
-  /** Days left before the task is removed by the retention policy. */
-  function daysLeft(task: { deletedAt: string | null }): number | null {
-    if (autoDeleteDays === null) return null;
-    if (!task.deletedAt) return null;
-    const deletedMs = Date.parse(task.deletedAt);
-    if (Number.isNaN(deletedMs)) return null;
-    const elapsedDays = Math.floor((Date.now() - deletedMs) / 86_400_000);
-    return Math.max(0, autoDeleteDays - elapsedDays);
-  }
-
+  /**
+   * Days left before the tree is removed by the retention policy. The clock
+   * starts at the *last* moment the tree entered the trash, which is the moment
+   * the newest of its rows was deleted — the same moment the backend counts
+   * from, so the label cannot promise more time than the code will grant.
+   */
   function retentionLabel(task: { deletedAt: string | null }): string {
-    if (autoDeleteDays === null) return t('settings.neverDeleted');
-    const left = daysLeft(task);
-    if (left === null) return t('settings.willDeleteOnNextRun');
-    if (left <= 0) return t('settings.willDeleteOnNextRun');
-    return t('settings.willDeleteIn').replace('{count}', String(left));
+    const verdict = retentionVerdict(task.deletedAt, trashRetentionDays);
+    if (verdict.kind === 'never') return t('settings.neverDeleted');
+    if (verdict.kind === 'nextRun') return t('settings.willDeleteOnNextRun');
+    return t('settings.willDeleteIn').replace('{count}', String(verdict.days));
   }
 
   interface DeletedGroup {
@@ -545,6 +540,36 @@
               }}
             />
             <span class="days-suffix">{settingsStore.language === 'en' ? 'tasks' : 'задач'}</span>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h3 class="settings-label">
+            {t('settings.trashRetention')}
+            <InfoHint text={t('settings.trashRetentionHint')} />
+          </h3>
+          <div class="days-row">
+            <input
+              class="days-input"
+              type="number"
+              min="1"
+              max="3650"
+              placeholder="—"
+              value={settingsStore.trashRetentionDays ?? ''}
+              aria-label={t('settings.trashRetentionDays')}
+              onchange={(e) => {
+                const raw = (e.currentTarget as HTMLInputElement).value.trim();
+                if (raw === '') {
+                  void settingsStore.setTrashRetentionDays(null);
+                  return;
+                }
+                const value = Number(raw);
+                if (Number.isInteger(value) && value >= 1 && value <= 3650) {
+                  void settingsStore.setTrashRetentionDays(value);
+                }
+              }}
+            />
+            <span class="days-suffix">{settingsStore.language === 'en' ? 'days' : 'дн.'}</span>
           </div>
         </section>
 

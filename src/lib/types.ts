@@ -88,6 +88,11 @@ export interface AppSettings {
    * lets the trash grow without a bound.
    */
   trashLimit: number;
+  /**
+   * Days a tree may sit in the trash before it is removed for good (null =
+   * never). Counted from the last moment the tree entered the trash.
+   */
+  trashRetentionDays: number | null;
   /** Interface language. */
   language: "ru" | "en";
   /** Subtasks are shown without being expanded by hand (default: true). */

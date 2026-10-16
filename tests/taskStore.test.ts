@@ -201,12 +201,32 @@ describe("taskStore", () => {
     settingsStore.autoDeleteDays = 30;
     invoke.mockReset();
     invoke.mockResolvedValueOnce([makeTask({ id: "gone" })]); // purge_completed_tasks
+    invoke.mockResolvedValueOnce([]); // purge_trash_by_age
     invoke.mockResolvedValueOnce([]); // list_tasks
 
     await taskStore.init();
 
     expect(invoke).toHaveBeenNthCalledWith(1, "purge_completed_tasks");
     settingsStore.autoDeleteDays = null;
+  });
+
+  it("sweeps the trash by age on every start, setting or no setting", async () => {
+    // The command reads the setting itself and does nothing while it is empty,
+    // so the call is unconditional: a trash that only ages out after the user
+    // happens to touch that field would be a trash that never empties.
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
+    const { settingsStore } =
+      await import("../src/stores/settingsStore.svelte");
+    settingsStore.trashRetentionDays = null;
+    invoke.mockReset();
+    invoke.mockResolvedValueOnce([]); // purge_completed_tasks
+    invoke.mockResolvedValueOnce([makeTask({ id: "forgotten" })]); // purge_trash_by_age
+    invoke.mockResolvedValueOnce([]); // list_tasks
+
+    await taskStore.init();
+
+    expect(invoke).toHaveBeenNthCalledWith(2, "purge_trash_by_age");
+    settingsStore.trashRetentionDays = null;
   });
 
   it("passes the cascade setting from the store", async () => {

@@ -13,9 +13,9 @@
 | Набор | Команда | Тестов |
 |-------|---------|--------|
 | Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 40 |
-| Rust integration | то же | 100 |
+| Rust integration | то же | 105 |
 | Rust документация | то же (`tests/documentation.rs`) | 4 |
-| TypeScript | `pnpm test` | 147 |
+| TypeScript | `pnpm test` | 152 |
 
 Числа берутся из фактического прогона. Если они разошлись с таблицей —
 значит, тесты забыли пересчитать, и это такое же расхождение кода и
@@ -92,6 +92,16 @@
 | `purge_moves_a_finished_tree_to_the_trash` | Закрытое дерево уходит в корзину вместе с подзадачами, а не исчезает |
 | `purge_waits_for_the_last_closure_in_the_tree` | Отсчёт идёт от последнего завершения в дереве |
 | `purge_leaves_a_tree_with_open_work_alone` | Незавершённая подзадача удерживает дерево, закрытая подзадача не уходит от открытого родителя |
+
+### Срок в корзине
+
+| Тест | Что проверяет |
+|------|---------------|
+| `purge_trash_by_age_removes_an_expired_tree` | Просроченное дерево удаляется из базы совсем, а свежая задача остаётся |
+| `purge_trash_by_age_waits_for_the_latest_deletion_in_the_tree` | Отсчёт идёт от последнего удаления в дереве, а не от первого |
+| `purge_trash_by_age_treats_a_deleted_subtask_on_its_own_as_its_own_unit` | Удалённая отдельно подзадача уходит сама, живой родитель остаётся |
+| `purge_trash_by_age_is_off_until_it_is_asked_for` | Настройка пуста по умолчанию: срок, о котором не просили, ничего не удаляет |
+| `the_trash_retention_is_stored_and_cleared_again` | Срок сохраняется и снимается обратно |
 
 ### Сроки
 
@@ -214,6 +224,7 @@ SSR-рендер компонента задачи — проверяет кон
 | `reparent moves a task under another parent` | Перенос задачи к другому родителю |
 | `moveToTab sends the task to another tab` | Перенос задачи в другую вкладку |
 | `purges expired completed tasks when the retention setting is on` | Автоочистка по настройке хранения |
+| `sweeps the trash by age on every start, setting or no setting` | Подметание корзины по сроку вызывается всегда: настройку читает команда |
 | `passes the cascade setting from the store` | Настройка каскада доходит до команды |
 | `keeps completed tasks visible when the setting is on` | Настройка показа завершённых учитывается |
 
@@ -281,6 +292,10 @@ SSR-рендер компонента задачи — проверяет кон
 | `sorts siblings by their order instead of the arrival order` | Порядок берётся из `sort_order` |
 | `does not lose a task when the data is malformed` | Устойчивость к битым данным |
 | `handles an empty trash` | Пустая корзина |
+| `never removes anything while the setting is empty` | Пустая настройка срока не удаляет ничего |
+| `counts the days down from the moment the task was thrown away` | Подпись считает дни от даты удаления |
+| `treats an overdue row as leaving on the next launch` | Просроченная строка уходит при следующем запуске |
+| `does not invent a deadline from a missing or broken timestamp` | Битая дата не превращается в обещание |
 
 ### `tests/text.test.ts`
 
@@ -395,8 +410,8 @@ GitHub Actions (`.github/workflows/ci.yml`):
 
 | Проверка | Команда | Результат |
 |----------|---------|-----------|
-| Тесты UI | `pnpm test` | 147 из 147 пройдено (20 файлов) |
-| Тесты Rust | `cargo test` | 40 unit + 100 интеграционных + 4 на документацию |
+| Тесты UI | `pnpm test` | 152 из 152 пройдено (20 файлов) |
+| Тесты Rust | `cargo test` | 40 unit + 105 интеграционных + 4 на документацию |
 
 Более ранний прогон, на котором сняты остальные строки таблицы:
 

@@ -757,6 +757,74 @@ pub fn purge_task(conn: &mut Connection, id: &str) -> Result<Vec<Task>, TaskErro
     Ok(doomed)
 }
 
+/// Removes what has sat in the trash longer than `days`, for good. Runs when the
+/// UI loads, like the completed-task sweep. Returns the tasks removed.
+///
+/// The unit is the tree, and the countdown starts at the *last* moment it
+/// entered the trash. Deleting a parent stamps the whole tree at once, so a
+/// subtask that arrived afterwards would otherwise be removed the same second
+/// it was thrown away — nobody had a chance to change their mind about it.
+///
+/// A subtree deleted on its own is its own unit: its parent is still in the
+/// list, and there is no tree to speak of.
+pub fn purge_trash_by_age(conn: &mut Connection, days: i64) -> Result<Vec<Task>, TaskError> {
+    if days <= 0 {
+        return Ok(Vec::new());
+    }
+    let tx = conn.transaction()?;
+
+    // One query for the same reason as `purge_completed_tasks`: a tree that
+    // entered the trash between two lookups must not be swept by the very
+    // check written to protect it.
+    let expired: Vec<Task> = {
+        let mut stmt = tx.prepare(&format!(
+            "SELECT {TASK_COLUMNS}
+             FROM tasks AS root
+             WHERE root.deleted_at IS NOT NULL
+               AND (
+                   root.parent_id IS NULL
+                   OR NOT EXISTS (
+                       SELECT 1 FROM tasks AS alive
+                       WHERE alive.id = root.parent_id
+                         AND alive.deleted_at IS NOT NULL
+                   )
+               )
+               AND datetime((
+                   SELECT MAX(gone.deleted_at) FROM tasks AS gone
+                   WHERE gone.id = root.id OR gone.parent_id = root.id
+               )) < datetime('now', ?1)"
+        ))?;
+        let rows = stmt
+            .query_map([format!("-{days} days")], row_to_task)?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows
+    };
+
+    let mut removed: Vec<Task> = Vec::new();
+    for root in expired {
+        let mut doomed = vec![root];
+        let root_id = doomed[0].id.clone();
+        doomed.extend(collect_all_descendants(&tx, &root_id)?);
+
+        // Children first so the foreign key never dangles mid-transaction.
+        let mut ids: Vec<String> = doomed.iter().map(|t| t.id.clone()).collect();
+        ids.sort_by_key(|child_id| {
+            doomed
+                .iter()
+                .position(|t| &t.id == child_id)
+                .unwrap_or(usize::MAX)
+        });
+        ids.reverse();
+        for task_id in ids {
+            tx.execute("DELETE FROM tasks WHERE id = ?1", [&task_id])?;
+        }
+        removed.extend(doomed);
+    }
+    purge_emptied_tabs(&tx)?;
+    tx.commit()?;
+    Ok(removed)
+}
+
 /// Evicts the oldest tasks once the trash is full, and reports what went.
 ///
 /// The oldest goes because it is the one the user has had longest to recover.
@@ -1551,6 +1619,13 @@ pub fn get_settings(conn: &Connection) -> Result<AppSettings, TaskError> {
             |row| row.get(0),
         )
         .optional()?;
+    let trash_retention_days: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'trash_retention_days'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
     let language: Option<String> = conn
         .query_row(
             "SELECT value FROM settings WHERE key = 'language'",
@@ -1589,6 +1664,7 @@ pub fn get_settings(conn: &Connection) -> Result<AppSettings, TaskError> {
             .unwrap_or(DEFAULT_TRASH_LIMIT)
             .clamp(TRASH_LIMIT_OFF, MAX_TRASH_LIMIT),
         auto_delete_days: auto_delete_days.and_then(|v| v.parse::<i64>().ok()),
+        trash_retention_days: trash_retention_days.and_then(|v| v.parse::<i64>().ok()),
         language: match language.as_deref() {
             Some("en") => "en".to_string(),
             _ => "ru".to_string(),
@@ -1635,6 +1711,14 @@ pub fn update_settings(
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         [settings
             .auto_delete_days
+            .map(|d| d.to_string())
+            .unwrap_or_default()],
+    )?;
+    tx.execute(
+        "INSERT INTO settings (key, value) VALUES ('trash_retention_days', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [settings
+            .trash_retention_days
             .map(|d| d.to_string())
             .unwrap_or_default()],
     )?;
