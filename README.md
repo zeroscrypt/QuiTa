@@ -134,7 +134,7 @@ Windows, `.AppImage` + `.deb` on Linux.
 - [x] **Comments** — autosaved, opened from the button next to a task.
 - [x] **Storm entry** — the field never closes after `Enter`, the caret stays put.
 - [x] **Drag & drop** — three zones, no timers and no dwell.
-- [x] **Recycle bin** — soft cascade delete with automatic retention cleanup.
+- [x] **Recycle bin** — soft cascade delete, a 200-task bound and automatic retention cleanup.
 - [x] **Search** — no delay, keeps the parent context.
 - [x] **Dark and light theme** — follows the system or pinned manually.
 - [x] **Русский and English** — switched in settings, applied immediately.
@@ -227,6 +227,14 @@ open, `Esc` clears the field, as it always did.
 - [x] **Reopening restores exactly the subtasks the cascade completed**, never the ones you finished yourself.
 - [x] **A subtask never touches its parent.** Unchecking one leaves the task closed and ◐ partially done.
 
+### The recycle bin
+
+- [x] **A task goes to the bin together with its subtasks.** A parent cannot stay behind without them: they would hang in lists where nothing shows them.
+- [x] **The bin keeps 200 tasks** — the number is yours to set, and zero turns the rule off. When it is full, deleting another task pushes the oldest out for good, subtasks included, and the rest shift up.
+- [x] **Displacement is announced.** That task did not go by your choice, so the toast names the one that left.
+- [x] **The header shows the real number**, not what fits on screen; the rest comes with "Show more".
+
+
 ---
 
 ## Data
@@ -291,8 +299,8 @@ therefore testable without a window.
 | `pnpm tauri dev` | Run with hot reload |
 | `pnpm tauri build` | Installers for the current platform |
 | `pnpm check` | Svelte and TypeScript types |
-| `pnpm test` | 146 unit tests |
-| `cargo test --manifest-path src-tauri/Cargo.toml` | 137 Rust tests (40 unit + 93 integration against a real database + 4 guarding the docs) |
+| `pnpm test` | 147 unit tests |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | 142 Rust tests (40 unit + 98 integration against a real database + 4 guarding the docs) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Lints, errors as warnings |
 | `cargo audit` | Vulnerabilities in dependencies |
 

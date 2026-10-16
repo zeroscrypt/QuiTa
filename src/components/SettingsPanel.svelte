@@ -525,6 +525,31 @@
       {#if active === 'trash'}
         <section class="settings-section">
           <h3 class="settings-label">
+            {t('settings.trashLimit')}
+            <InfoHint text={t('settings.trashLimitHint')} />
+          </h3>
+          <div class="days-row">
+            <input
+              class="days-input"
+              type="number"
+              min="0"
+              max="200"
+              value={settingsStore.trashLimit}
+              aria-label={t('settings.trashLimit')}
+              onchange={(e) => {
+                const raw = (e.currentTarget as HTMLInputElement).value.trim();
+                const value = Number(raw);
+                if (Number.isInteger(value) && value >= 0 && value <= 200) {
+                  void settingsStore.setTrashLimit(value);
+                }
+              }}
+            />
+            <span class="days-suffix">{settingsStore.language === 'en' ? 'tasks' : 'задач'}</span>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h3 class="settings-label">
             {t('settings.deleted')}
             <InfoHint text={t('settings.hintTrash')} />
           </h3>

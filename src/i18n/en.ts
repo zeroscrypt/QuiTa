@@ -180,6 +180,11 @@ export const en: Record<string, string> = {
   "settings.autoDeleteHint":
     "Completed tasks are deleted on the next app launch once the given number of days has passed. Leave empty to keep them.",
   "settings.autoDeleteDays": "After how many days",
+  "settings.trashLimit": "How many tasks the trash keeps",
+  "settings.trashLimitHint":
+    "When the trash is full, deleting another task pushes the oldest one out for good, together with its subtasks. Zero turns the rule off.",
+  "trash.evicted": "Trash full: “{title}” is gone for good",
+  "trash.evictedMany": "Trash full: {count} tasks are gone for good",
   "settings.data": "Data",
   "settings.export": "Export to JSON",
   "settings.exportDone": "Exported to {path}",

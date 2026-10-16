@@ -2,6 +2,8 @@ import { untrack } from 'svelte';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { SearchResult, Task, TaskId, TaskNode } from '$lib/types';
 import * as taskService from '$services/taskService';
+import { t } from '$i18n';
+import { truncate } from '$domain/taskRules';
 import { settingsStore } from './settingsStore.svelte';
 import { tabStore } from './tabStore.svelte';
 import { uiStore } from './uiStore.svelte';
@@ -11,6 +13,14 @@ class TaskStore {
   loading = $state(true);
   saving = $state(false);
   error = $state<string | null>(null);
+  /**
+   * A neutral toast for something the user has to know but did not ask for.
+   *
+   * Separate from `error`, which means "your action did not go through". This
+   * one means the action went through and had a side effect.
+   */
+  notice = $state<string | null>(null);
+  private noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
   searchQuery = $state('');
   searchResult = $state<SearchResult | null>(null);
@@ -274,7 +284,8 @@ class TaskStore {
 
   async remove(id: TaskId): Promise<void> {
     try {
-      const deletedTasks = await taskService.softDeleteTask(id);
+      const outcome = await taskService.softDeleteTask(id);
+      const deletedTasks = outcome.deleted;
       const ids = new Set(deletedTasks.map((t) => t.id));
       // The backend cascades, so the answer contains the task *and* its
       // subtasks. Deleting a subtask must remove it from its parent's child
@@ -294,10 +305,35 @@ class TaskStore {
       this.expanded = expanded;
       this.collapsed = collapsed;
       this.touchTabCounts();
+      if (outcome.evicted.length > 0) {
+        this.announceEviction(outcome.evicted);
+      }
+      await this.loadDeleted();
     } catch (e) {
       this.showError(e);
       await this.load();
     }
+  }
+
+  /**
+   * Announces that the trash was full and something left it for good.
+   *
+   * This is the one deletion nobody asked for, so it cannot be silent: the task
+   * the user actually deleted is safe in the trash, and a different one is
+   * gone. Naming it is the difference between a rule working and a task
+   * vanishing without an account of where it went.
+   */
+  private announceEviction(evicted: Task[]): void {
+    const title = truncate(evicted[0].title, 40);
+    this.notice =
+      evicted.length === 1
+        ? t('trash.evicted', { title })
+        : t('trash.evictedMany', { count: String(evicted.length), title });
+    if (this.noticeTimer) clearTimeout(this.noticeTimer);
+    this.noticeTimer = setTimeout(() => {
+      this.notice = null;
+      this.noticeTimer = null;
+    }, 7000);
   }
 
   async restore(id: TaskId): Promise<void> {

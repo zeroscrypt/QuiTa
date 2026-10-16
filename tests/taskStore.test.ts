@@ -35,6 +35,7 @@ describe("taskStore", () => {
     const { taskStore } = await import("../src/stores/taskStore.svelte");
     taskStore.nodes = [];
     taskStore.error = null;
+    taskStore.notice = null;
   });
 
   it("adds a new root task to the top of the list", async () => {
@@ -83,7 +84,11 @@ describe("taskStore", () => {
   });
 
   it("removes the node after soft delete", async () => {
-    invoke.mockResolvedValueOnce([makeTask({ id: "a" })]);
+    invoke.mockResolvedValueOnce({
+      deleted: [makeTask({ id: "a" })],
+      evicted: [],
+    });
+    invoke.mockResolvedValueOnce({ tasks: [], total: 0 });
     const { taskStore } = await import("../src/stores/taskStore.svelte");
     taskStore.nodes = [
       { task: makeTask({ id: "a" }), children: [] },
@@ -93,6 +98,25 @@ describe("taskStore", () => {
     await taskStore.remove("a");
 
     expect(taskStore.nodes.map((n) => n.task.id)).toEqual(["b"]);
+    expect(taskStore.notice).toBeNull();
+  });
+
+  // The size rule is the one deletion nobody asked for: the task the user
+  // deleted is safe in the trash, and a different one is gone. Staying silent
+  // would leave a task missing with no account of where it went.
+  it("names the task the full trash pushed out", async () => {
+    invoke.mockResolvedValueOnce({
+      deleted: [makeTask({ id: "a", title: "Только что удалённая" })],
+      evicted: [makeTask({ id: "z", title: "Самая старая" })],
+    });
+    invoke.mockResolvedValueOnce({ tasks: [], total: 0 });
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
+    taskStore.nodes = [{ task: makeTask({ id: "a" }), children: [] }];
+
+    await taskStore.remove("a");
+
+    expect(taskStore.notice).toContain("Самая старая");
+    expect(taskStore.notice).not.toContain("Только что удалённая");
   });
 
   it("toggle applies the outcome in place instead of reloading the list", async () => {

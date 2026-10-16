@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
+  DeleteOutcome,
   ReparentReceipt,
   SearchResult,
   Task,
@@ -38,8 +39,8 @@ export function setTaskComment(id: TaskId, comment: string | null): Promise<Task
   return invoke<Task>('set_task_comment', { id, comment });
 }
 
-export function softDeleteTask(id: TaskId): Promise<Task[]> {
-  return invoke<Task[]>('soft_delete_task', { id });
+export function softDeleteTask(id: TaskId): Promise<DeleteOutcome> {
+  return invoke<DeleteOutcome>('soft_delete_task', { id });
 }
 
 export function restoreTask(id: TaskId): Promise<Task[]> {

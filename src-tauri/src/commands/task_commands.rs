@@ -73,13 +73,25 @@ pub async fn set_task_comment(
     repository::set_comment(&mut conn, &id, comment.as_deref())
 }
 
+/// What a delete did: the tasks it moved to the trash, and what fell out of
+/// the trash because it was full.
+///
+/// Both halves are returned because both are things the user needs to be told
+/// about — the first is visible, the second is gone for good.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteOutcome {
+    pub deleted: Vec<crate::domain::task::Task>,
+    pub evicted: Vec<crate::domain::task::Task>,
+}
+
 #[tauri::command]
-pub async fn soft_delete_task(
-    id: TaskId,
-    db: State<'_, Db>,
-) -> Result<Vec<crate::domain::task::Task>, TaskError> {
+pub async fn soft_delete_task(id: TaskId, db: State<'_, Db>) -> Result<DeleteOutcome, TaskError> {
     let mut conn = db.lock().map_err(TaskError::Internal)?;
-    repository::soft_delete_task(&mut conn, &id)
+    let deleted = repository::soft_delete_task(&mut conn, &id)?;
+    let settings = repository::get_settings(&conn)?;
+    let evicted = repository::trim_trash(&mut conn, settings.trash_limit)?;
+    Ok(DeleteOutcome { deleted, evicted })
 }
 
 #[tauri::command]

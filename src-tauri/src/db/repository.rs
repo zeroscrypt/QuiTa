@@ -18,6 +18,22 @@ pub const DEFAULT_TAB_NAME: &str = "Новая вкладка";
 /// and `next_sort_order_at_bottom` a step away from overflowing.
 const SORT_ORDER_LIMIT: i64 = 1 << 40;
 
+/// How many soft-deleted tasks the trash keeps by default, and the most it can
+/// ever be told to keep.
+///
+/// This is a bound on stored data, not on the window the interface renders:
+/// once the trash is full, deleting anything pushes the oldest task out
+/// permanently. The default is also the ceiling, because raising it would only
+/// make the silent loss slower to arrive.
+pub const DEFAULT_TRASH_LIMIT: i64 = 200;
+pub const MAX_TRASH_LIMIT: i64 = 200;
+/// Zero is not "keep nothing" but "do not evict by size at all", which is why
+/// the range starts here rather than at one. A trash that keeps nothing would
+/// destroy every task the moment it was deleted, with the undo notice still on
+/// screen; a trash with no bound is simply the user declining the rule, and the
+/// age rule still clears it if they set one.
+pub const TRASH_LIMIT_OFF: i64 = 0;
+
 const TASK_COLUMNS: &str = "id, parent_id, tab_id, title, created_at, updated_at, completed_at, deleted_at, due_date, comment, sort_order, completion_event_id, auto_completed_by";
 
 fn now_rfc3339() -> String {
@@ -744,6 +760,71 @@ pub fn purge_task(conn: &mut Connection, id: &str) -> Result<Vec<Task>, TaskErro
     Ok(doomed)
 }
 
+/// Evicts the oldest tasks once the trash is full, and reports what went.
+///
+/// The oldest goes because it is the one the user has had longest to recover.
+/// A task leaves together with its subtasks, the same rule the per-task
+/// permanent delete already follows: a parent without its children would leave
+/// them in the trash belonging to nothing, where no list would show them.
+///
+/// The count may end up below the limit rather than exactly at it, and that is
+/// correct: keeping a parent and half its subtasks is worse than keeping fewer.
+pub fn trim_trash(conn: &mut Connection, limit: i64) -> Result<Vec<Task>, TaskError> {
+    // Zero is a choice, not a small number: the rule is off and the trash
+    // grows without a bound.
+    if limit <= TRASH_LIMIT_OFF {
+        return Ok(Vec::new());
+    }
+    let limit = limit.min(MAX_TRASH_LIMIT);
+    let tx = conn.transaction()?;
+
+    let overflowing: Vec<String> = {
+        let mut stmt = tx.prepare(
+            "SELECT id FROM tasks WHERE deleted_at IS NOT NULL
+             ORDER BY deleted_at DESC, sort_order ASC
+             LIMIT -1 OFFSET ?1",
+        )?;
+        let rows = stmt
+            .query_map([limit], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows
+    };
+    if overflowing.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut evicted: Vec<Task> = Vec::new();
+    for id in overflowing {
+        // A parent may already have gone with its own descendants.
+        let gone = tx
+            .query_row("SELECT 1 FROM tasks WHERE id = ?1", [&id], |r| {
+                r.get::<_, i64>(0)
+            })
+            .optional()?
+            .is_none();
+        if gone {
+            continue;
+        }
+        let doomed = {
+            let root = get_task_row(&tx, &id, true)?;
+            let mut all = vec![root];
+            all.extend(collect_all_descendants(&tx, &id)?);
+            all
+        };
+        let mut ids: Vec<String> = doomed.iter().map(|task| task.id.clone()).collect();
+        // Children first, so the foreign key never dangles mid-transaction.
+        ids.reverse();
+        for task_id in &ids {
+            tx.execute("DELETE FROM tasks WHERE id = ?1", [task_id])?;
+        }
+        evicted.extend(doomed);
+    }
+
+    purge_emptied_tabs(&tx)?;
+    tx.commit()?;
+    Ok(evicted)
+}
+
 /// Permanently removes every soft-deleted task (used by "delete all").
 ///
 /// A row whose parent is deleted belongs to the deleted tree even when its
@@ -1459,6 +1540,13 @@ pub fn get_settings(conn: &Connection) -> Result<AppSettings, TaskError> {
             |row| row.get(0),
         )
         .optional()?;
+    let trash_limit: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'trash_limit'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
     let auto_delete_days: Option<String> = conn
         .query_row(
             "SELECT value FROM settings WHERE key = 'auto_delete_days'",
@@ -1499,6 +1587,10 @@ pub fn get_settings(conn: &Connection) -> Result<AppSettings, TaskError> {
         show_completed: show_completed.as_deref() == Some("1"),
         // A missing key means the default: completing a parent cascades.
         cascade_complete: cascade.as_deref() != Some("0"),
+        trash_limit: trash_limit
+            .and_then(|v| v.parse::<i64>().ok())
+            .unwrap_or(DEFAULT_TRASH_LIMIT)
+            .clamp(TRASH_LIMIT_OFF, MAX_TRASH_LIMIT),
         auto_delete_days: auto_delete_days.and_then(|v| v.parse::<i64>().ok()),
         language: match language.as_deref() {
             Some("en") => "en".to_string(),
@@ -1532,6 +1624,14 @@ pub fn update_settings(
         "INSERT INTO settings (key, value) VALUES ('cascade_complete', ?1)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         [flag(settings.cascade_complete)],
+    )?;
+    tx.execute(
+        "INSERT INTO settings (key, value) VALUES ('trash_limit', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [settings
+            .trash_limit
+            .clamp(TRASH_LIMIT_OFF, MAX_TRASH_LIMIT)
+            .to_string()],
     )?;
     tx.execute(
         "INSERT INTO settings (key, value) VALUES ('auto_delete_days', ?1)
