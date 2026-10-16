@@ -291,7 +291,7 @@ therefore testable without a window.
 | `pnpm tauri dev` | Run with hot reload |
 | `pnpm tauri build` | Installers for the current platform |
 | `pnpm check` | Svelte and TypeScript types |
-| `pnpm test` | 141 unit tests |
+| `pnpm test` | 146 unit tests |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | 137 Rust tests (40 unit + 93 integration against a real database + 4 guarding the docs) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Lints, errors as warnings |
 | `cargo audit` | Vulnerabilities in dependencies |

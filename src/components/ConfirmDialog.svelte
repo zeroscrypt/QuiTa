@@ -29,8 +29,7 @@
   $effect(() => {
     if (!deleteState && !tabState) return;
     return uiStore.openLayer('confirm', () => {
-      uiStore.cancelDelete();
-      uiStore.cancelTabDelete();
+uiStore.cancelConfirm();
     });
   });
 
@@ -51,15 +50,13 @@
       }
     } finally {
       busy = false;
-      uiStore.cancelDelete();
-      uiStore.cancelTabDelete();
+uiStore.cancelConfirm();
     }
   }
 
   function onBackdropClick(event: MouseEvent) {
     if (event.target !== event.currentTarget) return;
-    uiStore.cancelDelete();
-    uiStore.cancelTabDelete();
+uiStore.cancelConfirm();
   }
 </script>
 
@@ -98,7 +95,7 @@
         {/if}
       </p>
       <div class="dialog-actions">
-        <button class="button secondary" onclick={() => uiStore.cancelDelete()}>{t('delete.cancel')}</button>
+        <button class="button secondary" onclick={() => uiStore.cancelConfirm()}>{t('delete.cancel')}</button>
         <button class="button danger" bind:this={confirmBtn} disabled={busy} onclick={() => void confirm()}>
           {busy
             ? t('delete.working')

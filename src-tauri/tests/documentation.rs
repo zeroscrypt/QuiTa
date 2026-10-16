@@ -136,13 +136,14 @@ fn count_ts_tests() -> usize {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) == Some("ts") {
                 let text = std::fs::read_to_string(&path).unwrap_or_default();
-                // `it(` followed by a quote, not any substring ending in "it(":
-                // `await taskStore.init()` contains one too.
+                // A test is declared by a line whose first token is `it(`. The
+                // earlier rule looked for `it(` anywhere in the line, which also
+                // matched `await taskStore.init()` — and then `.split('\n')`
+                // inside a test body, which made the documented count disagree
+                // with the number of tests vitest actually runs.
                 total += text
                     .lines()
-                    .filter(|line| {
-                        line.contains("it('") || line.contains("it(\"") || line.contains("it(`")
-                    })
+                    .filter(|line| line.trim_start().starts_with("it("))
                     .count();
             }
         }
@@ -180,7 +181,8 @@ fn the_test_counts_in_the_docs_match_the_code() {
     // The noun form changes with the number — 141 модульный тест, 142
     // модульных теста — so the marker is the stem that stays put. Matching the
     // full phrase would have forced bad grammar into the README to satisfy the
-    // guard.
+    // guard: 141 модульный тест is the correct form, and it shares no whole
+    // phrase with the plural.
     assert!(
         readme_has(&readme, "модульн", ts),
         "README.ru.md does not state the TypeScript count {ts}"
