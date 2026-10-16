@@ -1,8 +1,16 @@
 <script lang="ts">
   import { t } from '$i18n';
   import { taskStore } from '$stores/taskStore.svelte';
+  import { uiStore } from '$stores/uiStore.svelte';
 
   let query = $state('');
+  let inputEl = $state<HTMLInputElement | null>(null);
+
+  // The shortcut asks for the caret; the field that owns it moves it. A counter
+  // rather than a boolean, so two searches in a row focus twice.
+  $effect(() => {
+    if (uiStore.focusSearchRequest > 0) inputEl?.focus();
+  });
 
   // Search runs on every keystroke: the database is local, so the query is
   // cheap and there is nothing to wait for.
@@ -23,6 +31,7 @@
   </svg>
   <input
     class="search-input"
+    bind:this={inputEl}
     bind:value={query}
     oninput={onInput}
     onkeydown={(e) => {

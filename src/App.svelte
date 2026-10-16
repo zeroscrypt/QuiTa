@@ -19,6 +19,7 @@
   import { t } from '$i18n';
   import type { TaskNode } from '$lib/types';
   import { newestRowIndex, scrollTopForTarget } from '$lib/scroll';
+  import { appShortcut } from '$lib/appShortcut';
   import { isTabShortcut, tabForDigit } from '$lib/tabShortcut';
 
   onMount(async () => {
@@ -75,7 +76,7 @@
    */
   function onWindowKeydown(event: KeyboardEvent) {
     onEscape(event);
-    if (event.defaultPrevented || !isTabShortcut(event)) return;
+    if (event.defaultPrevented) return;
     // A dialog owns the keyboard while it is open.
     if (
       uiStore.settingsOpen ||
@@ -86,6 +87,16 @@
       return;
     }
 
+    const asked = appShortcut(event);
+    if (asked) {
+      event.preventDefault();
+      if (asked === "newTab") uiStore.requestNewTab();
+      else if (asked === "focusSearch") uiStore.requestFocusSearch();
+      else uiStore.openSettings();
+      return;
+    }
+
+    if (!isTabShortcut(event)) return;
     const target = tabForDigit(tabStore.tabs, Number(event.key));
     if (!target) return;
 

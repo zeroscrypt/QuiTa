@@ -84,6 +84,12 @@ export class UiStore {
    */
   focusInputRequest = $state(0);
 
+  /** Bumped by the shortcut for search; SearchBar moves the caret. */
+  focusSearchRequest = $state(0);
+
+  /** Bumped by the shortcut for a new tab; TabsBar opens its field. */
+  newTabRequest = $state(0);
+
   private unlistenAbout: (() => void) | null = null;
   private exportTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingUndo: PendingUndo | null = null;
@@ -283,6 +289,33 @@ export class UiStore {
   /** Puts the caret in the task input so a task can be typed at once. */
   requestFocusInput(): void {
     this.focusInputRequest++;
+  }
+
+  /**
+   * Asks for the search field's caret, counted because two searches in a row
+   * must focus twice and a boolean would read as one request.
+   *
+   * The search bar answers it: it owns the field, and a window reaching into it
+   * through the DOM would be guessing.
+   */
+  requestFocusSearch(): void {
+    this.focusSearchRequest++;
+  }
+
+  /**
+   * Asks the tab strip to start creating a tab.
+   *
+   * The shortcut does not create a nameless tab behind the user's back: it opens
+   * the same inline field the "+" button opens, so a shortcut and a click leave
+   * the same result — including the name, which is what the tab is for.
+   */
+  requestNewTab(): void {
+    this.newTabRequest++;
+  }
+
+  /** Opens the settings panel, from the header button or from the shortcut. */
+  openSettings(): void {
+    this.settingsOpen = true;
   }
 
   /** Incremented by the header button; App.svelte performs the scroll. */

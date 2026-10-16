@@ -196,6 +196,20 @@ takes the shortcut for itself.
 Clicking a tab with the mouse behaves the same way: the input is ready
 immediately.
 
+### The other shortcuts
+
+| Shortcut | What it does |
+|----------|--------------|
+| `Cmd+T` / `Ctrl+T` | a new tab — opens the same name field as the "+" button |
+| `Cmd+F` / `Ctrl+F` | caret into the search field |
+| `Cmd+S` / `Ctrl+S` | settings |
+| `Cmd+1`…`Cmd+9` / `Ctrl+1`…`Ctrl+9` | switching tabs (above) |
+
+All three take the same modifier as the digits, and hand the keyboard to an
+open dialog exactly as those do. `Cmd+T` does not create a nameless tab behind
+your back: it opens the same field the button opens, name included — the name is
+what the tab is for.
+
 ### Escape
 
 `Esc` closes the topmost layer, one layer per press: date, comment, menu,
@@ -300,7 +314,7 @@ therefore testable without a window.
 | `pnpm tauri dev` | Run with hot reload |
 | `pnpm tauri build` | Installers for the current platform |
 | `pnpm check` | Svelte and TypeScript types |
-| `pnpm test` | 159 unit tests |
+| `pnpm test` | 164 unit tests |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | 156 Rust tests (40 unit + 112 integration against a real database + 4 guarding the docs) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Lints, errors as warnings |
 | `cargo audit` | Vulnerabilities in dependencies |
