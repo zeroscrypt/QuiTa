@@ -76,6 +76,13 @@ class UiStore {
 
   /** Incremented by the header button; App.svelte performs the scroll. */
   scrollToNewestRequest = $state(0);
+  /**
+   * Bumped when something outside the input wants the caret in it — switching
+   * tabs with the keyboard, for one. A counter rather than a boolean, because
+   * two switches in a row must move focus twice, and a flag set to true twice
+   * reads as one request.
+   */
+  focusInputRequest = $state(0);
 
   private unlistenAbout: (() => void) | null = null;
   private exportTimer: ReturnType<typeof setTimeout> | null = null;
@@ -206,6 +213,11 @@ class UiStore {
     this.unlistenAbout = await listen("quita:about", () => {
       this.aboutOpen = true;
     });
+  }
+
+  /** Puts the caret in the task input so a task can be typed at once. */
+  requestFocusInput(): void {
+    this.focusInputRequest++;
   }
 
   /** Incremented by the header button; App.svelte performs the scroll. */

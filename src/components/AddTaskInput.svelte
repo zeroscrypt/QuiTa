@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { taskStore } from '$stores/taskStore.svelte';
   import { appStore } from '$stores/appStore.svelte';
+  import { uiStore } from '$stores/uiStore.svelte';
   import { normalizeTitle } from '$domain/taskValidation';
   import { onEnter } from '$lib/capture';
 
@@ -21,6 +22,14 @@
   function focusInput() {
     inputEl?.focus();
   }
+
+  // Switching tabs with the keyboard ends with the caret here, so the next
+  // thing typed becomes a task in the tab just selected. Without this the
+  // shortcut would switch tabs and then leave the keyboard user hunting for
+  // where to type.
+  $effect(() => {
+    if (uiStore.focusInputRequest > 0) focusInput();
+  });
 
   function onInput() {
     if (error) error = null;

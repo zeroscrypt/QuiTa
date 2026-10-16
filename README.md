@@ -183,6 +183,16 @@ Each of these is a reason to stop being a buffer.
 `Enter` creates the task, clears the field and keeps the caret. Press `+` on a
 root task and the subtask field behaves identically.
 
+### Switching tabs
+
+`Cmd+1`…`Cmd+9` on macOS, `Ctrl+1`…`Ctrl+9` on Windows and Linux — the same
+binding every app with tabs already uses. The digit is the position in the
+tab strip, so dragging tabs around renumbers them.
+
+The caret lands in the task input either way, so a task can be typed into the
+tab just selected. A digit past the last tab does nothing, and an open dialog
+takes the shortcut for itself.
+
 ### Three drag zones
 
 ```
@@ -268,7 +278,7 @@ therefore testable without a window.
 | `pnpm tauri dev` | Run with hot reload |
 | `pnpm tauri build` | Installers for the current platform |
 | `pnpm check` | Svelte and TypeScript types |
-| `pnpm test` | 122 unit tests |
+| `pnpm test` | 130 unit tests |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | 134 Rust tests (40 unit + 90 integration against a real database + 4 guarding the docs) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Lints, errors as warnings |
 | `cargo audit` | Vulnerabilities in dependencies |
