@@ -3,14 +3,13 @@ name: CI
 on:
   push:
     branches: [main]
+  # Release Please's pull request is left out of the jobs, not out of the
+  # triggers. For `pull_request` the branch filters look at the branch a pull
+  # request *targets*, which is always `main` here — never at the branch it
+  # comes from, which is the one that needed skipping. Eleven runs waited
+  # forever on exactly that misunderstanding. The condition is on the jobs,
+  # where `github.head_ref` is the branch that matters; see `changes`.
   pull_request:
-    # Release Please opens its pull request with the repository token, and
-    # GitHub holds `pull_request` workflows on such a branch until a person
-    # approves them. Nobody ever does, so the branch collected eleven runs that
-    # waited forever and checked nothing. The version bump is already covered by
-    # the CI of the main commit it is built from.
-    branches-ignore:
-      - 'release-please--**'
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -37,6 +36,18 @@ jobs:
   # pipeline work, so this was the single largest source of wasted runner time.
   changes:
     name: What changed
+    # A pull request from a release-please-- branch carries a version bump and a
+    # changelog, nothing else: the code on it was already built by the CI of the
+    # commit it was built from. So no job here has work to do.
+    #
+    # It still has to *report*. Branch protection on main lists every job in
+    # this file as required, and the two things that look the same are not: a
+    # skipped job reports success, while a workflow left out of the run never
+    # reports at all and blocks the pull request forever.
+    #
+    # `github.event_name` is here because `head_ref` is empty on a push, and the
+    # push to main that carries the release itself has to be checked as usual.
+    if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
     runs-on: ubuntu-latest
     # A stuck job must not hold a runner for the six hours GitHub allows.
     timeout-minutes: 10
@@ -105,6 +116,10 @@ jobs:
 
   frontend:
     name: Frontend (lint, typecheck, tests, build)
+    # The same reason as in `changes`, and the same need to report. `rust` and
+    # the three Tauri builds inherit the skip through `needs: changes`; this job
+    # has no such dependency, so it carries its own condition.
+    if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
     runs-on: ubuntu-latest
     # A stuck job must not hold a runner for the six hours GitHub allows.
     timeout-minutes: 15
@@ -177,15 +192,23 @@ jobs:
       # of green runs: nothing in the code had changed, only the advisory
       # database. The two ignored entries are build-time crates with no fix
       # available; both are recorded in docs/DISTRIBUTION.md.
+      #
+      # This is a command, not rustsec/audit-check, and the difference is the
+      # whole point. That action also publishes its result as a check run, which
+      # needs the `checks: write` permission this workflow deliberately does not
+      # grant. The day the database first reported a yanked crate it made the
+      # job fall over with "403 on create-a-check-run" while the audit itself had
+      # found nothing wrong — a job that failed about reporting, not about the
+      # dependencies. Reading the lock file and the database needs no
+      # permission at all, and a command also keeps working for pull requests
+      # from forks, whose token cannot write anything.
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
       - name: Audit dependencies
-        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # Cargo.lock lives next to the crate, not at the repository root.
-          # Without this the action compiles cargo-audit for two minutes and
-          # then fails looking for a file that was never there.
-          working-directory: src-tauri
-          ignore: RUSTSEC-2024-0370, RUSTSEC-2024-0429
+        # Cargo.lock lives next to the crate, not at the repository root.
+        working-directory: src-tauri
+        run: cargo audit --ignore RUSTSEC-2024-0370 --ignore RUSTSEC-2024-0429
 
   tauri-build-macos:
     needs: changes
