@@ -263,7 +263,29 @@ jobs:
             exit 0
           fi
 
-          gh pr merge "$number" --repo "$REPO" --squash --delete-branch
+          # GitHub refuses the merge for a moment after the last check reports,
+          # because it has not recomputed the branch policy yet. It says so
+          # plainly — "the base branch policy prohibits the merge" — and the pull
+          # request is, in fact, mergeable a second later.
+          #
+          # On this repository that race is not a corner case but the normal
+          # case: every job on a release branch is skipped, so the checks go green
+          # instantly without a runner, and the merge is attempted in the same
+          # breath. A single attempt lost the release; five more cost a minute.
+          merged=""
+          for attempt in 1 2 3 4 5 6; do
+            if gh pr merge "$number" --repo "$REPO" --squash --delete-branch; then
+              merged="yes"
+              break
+            fi
+            echo "GitHub has not recomputed the policy yet (attempt $attempt of 6)."
+            sleep 10
+          done
+
+          if [ "$merged" != "yes" ]; then
+            echo "::error::PR #$number stayed unmergeable although its checks passed."
+            exit 1
+          fi
           echo "::notice::PR #$number merged, the tag builds on the next run."
 
   # Compares what the manifest promises against what GitHub actually holds.
