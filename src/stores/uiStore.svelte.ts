@@ -192,7 +192,16 @@ export class UiStore {
     this.confirmTabDelete = { tab, taskCount };
   }
 
-  cancelTabDelete(): void {
+  /**
+   * Closes the confirmation dialog, whichever question it was asking.
+   *
+   * A task and a tab share one dialog but not one state field, so cancelling has
+   * to clear both. It lives in a single method because the pair was already
+   * written out in four places, and the one place it was forgotten was the
+   * Cancel button: the tab question then had no way out except confirming it.
+   */
+  cancelConfirm(): void {
+    this.confirmDelete = null;
     this.confirmTabDelete = null;
   }
 
@@ -298,10 +307,6 @@ export class UiStore {
 
   askDelete(task: Task, cascadeCount: number): void {
     this.confirmDelete = { task, cascadeCount };
-  }
-
-  cancelDelete(): void {
-    this.confirmDelete = null;
   }
 
   /** Progress of an export/import round trip, shown as a toast. */
