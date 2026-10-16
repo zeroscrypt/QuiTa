@@ -194,6 +194,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # Reading the release pull requests is half of this check: the other half
+      # is their label, and with no permission to read them the check would
+      # silently have nothing to look at.
+      pull-requests: read
     steps:
       - name: Compare the manifest with the published releases
         env:
@@ -226,6 +230,35 @@ jobs:
           newest="${latest#v}"
           if [ "$promised" != "$newest" ]; then
             echo "::error::version $promised is recorded as released but the newest tag is $latest. A release was merged and never published; /releases/latest serves $newest, so the installer is behind the code."
+            exit 1
+          fi
+
+          # The other half of the same promise, and the half that was missing.
+          # Release Please finds merged release pull requests by this label and
+          # swaps it for `autorelease: tagged` once the release exists. If that
+          # call fails, the label stays, and every later run retries that same
+          # pull request first and fails the same way — while the check above
+          # stays green, because whoever hit the failure restored the tag and the
+          # release by hand. That is how 1.2.1 froze every release: a 403 on
+          # create-a-release, which passed `target_commitish` for a tag that had
+          # already been made by hand, and nothing but a red mark to show it.
+          #
+          # A release still in flight is not stuck: merging the release pull
+          # request is what writes the manifest, so its version equals the
+          # manifest's. Only a version behind the manifest can be a wedged one.
+          stale=""
+          while read -r number version; do
+            [ -n "$number" ] || continue
+            lower="$(printf '%s\n%s\n' "$version" "$promised" | sort -V | sed -n 1p)"
+            if [ "$version" != "$promised" ] && [ "$lower" = "$version" ]; then
+              stale="${stale} #${number} (${version})"
+            fi
+          done < <(gh pr list --repo "$REPO" --state merged --label "autorelease: pending" \
+            --limit 50 --json number,title \
+            --jq '.[] | select(.title | test("release [0-9]+\\.[0-9]+\\.[0-9]+")) | "\(.number) \(.title | capture("release (?<v>[0-9]+\\.[0-9]+\\.[0-9]+)").v)"')
+
+          if [ -n "$stale" ]; then
+            echo "::error::release pull request(s)$stale still carry the pending label while the manifest says $promised. They were never released by Release Please, and every run retries them instead of releasing anything new. Tell it they are done: gh pr edit <number> --remove-label 'autorelease: pending' --add-label 'autorelease: tagged'"
             exit 1
           fi
 
