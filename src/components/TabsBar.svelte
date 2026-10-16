@@ -376,7 +376,14 @@ function openMenuByKeyboard(event: KeyboardEvent, tabId: string): boolean {
           title={`${tab.name} — ${t('task.renameHint')}`}
           ondblclick={() => startRename(tab.id, tab.name)}
           oncontextmenu={(e) => openMenu(e, tab.id)}
-          onclick={() => select(tab.id)}
+          onclick={() => {
+            select(tab.id);
+            // Clicking a tab with the mouse should leave the keyboard ready,
+            // the same way the number shortcut does. Without this the user has
+            // to click the input again before typing, which is the second click
+            // that selecting a tab with the keyboard never needs.
+            uiStore.requestFocusInput();
+          }}
           onpointerdown={(e) => onTabPointerDown(e, tab.id)}
           onkeydown={(e) => onTabKeydown(e, index)}
         >

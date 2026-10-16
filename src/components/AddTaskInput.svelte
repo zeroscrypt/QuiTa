@@ -65,6 +65,10 @@
 
   /** Escape empties the field: the storm stops, the input stays where it is. */
   function clearField(event: KeyboardEvent) {
+    // An open layer owns Escape, and it will put the caret back here when it
+    // closes. Clearing the field as well would throw away half-typed text for
+    // a keystroke the user meant for the popover above it.
+    if (uiStore.layerCount > 0) return;
     event.preventDefault();
     if (!title) return;
     title = '';
