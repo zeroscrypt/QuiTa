@@ -143,12 +143,30 @@ pub async fn purge_completed_tasks(
     repository::purge_completed_tasks(&mut conn, days)
 }
 
+/// One window of the trash, together with the total it is a window of.
+///
+/// The total is not a convenience: the header has to say how many tasks are
+/// really there before anyone agrees to empty the bin. A count of one page
+/// sitting above "delete everything" is how three hundred tasks used to
+/// disappear behind a dialog that promised two hundred.
 #[tauri::command]
 pub async fn list_deleted_tasks(
     db: State<'_, Db>,
-) -> Result<Vec<crate::domain::task::Task>, TaskError> {
+    offset: Option<i64>,
+) -> Result<TrashPage, TaskError> {
     let conn = db.lock().map_err(TaskError::Internal)?;
-    repository::list_deleted_all(&conn, TRASH_PAGE_SIZE)
+    let offset = offset.unwrap_or(0).max(0);
+    let tasks = repository::list_deleted_all(&conn, TRASH_PAGE_SIZE, offset)?;
+    let total = repository::count_deleted(&conn)?;
+    Ok(TrashPage { tasks, total })
+}
+
+/// A window of the trash plus how many are in there altogether.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrashPage {
+    pub tasks: Vec<crate::domain::task::Task>,
+    pub total: i64,
 }
 
 #[tauri::command]

@@ -86,8 +86,14 @@ export function listTasks(
   return invoke<TaskNode[]>('list_tasks', { includeCompleted, tabId });
 }
 
-export function listDeletedTasks(): Promise<Task[]> {
-  return invoke<Task[]>('list_deleted_tasks');
+/** A window of the trash plus how many tasks are in there altogether. */
+export interface TrashPage {
+  tasks: Task[];
+  total: number;
+}
+
+export function listDeletedTasks(offset = 0): Promise<TrashPage> {
+  return invoke<TrashPage>('list_deleted_tasks', { offset });
 }
 
 export function listSubtasks(parentId: TaskId): Promise<Task[]> {

@@ -839,6 +839,13 @@ kbd {
   transform: translateX(16px);
 }
 
+/* Shown only when the bin holds more than one window of tasks. */
+.deleted-more {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-sm) 0 0;
+}
+
 .deleted-list {
   list-style: none;
   margin: 0;

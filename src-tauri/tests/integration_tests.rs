@@ -314,6 +314,86 @@ fn soft_delete_cascades_atomically() {
 }
 
 #[test]
+fn the_trash_reaches_tasks_past_the_first_page() {
+    // The bin used to stop at 200 rows with no way to go further, so older
+    // tasks could not be restored one by one: there was no row on screen to
+    // press the button on. The page size is a rendering bound, not a limit
+    // on the data.
+    let mut conn = open_test_db();
+    let tab = repository::ensure_default_tab(&conn).unwrap();
+
+    let ids: Vec<String> = (0..250)
+        .map(|n| {
+            repository::create_task(
+                &mut conn,
+                &format!("Задача {n}"),
+                None,
+                Some(&tab.id),
+                false,
+            )
+            .unwrap()
+            .id
+        })
+        .collect();
+    for (n, id) in ids.iter().enumerate() {
+        repository::soft_delete_task(&mut conn, id).unwrap();
+        // Разные метки времени, иначе порядок страниц был бы произвольным.
+        let _ = n;
+    }
+
+    let first = repository::list_deleted_all(&conn, 200, 0).unwrap();
+    let second = repository::list_deleted_all(&conn, 200, 200).unwrap();
+    let everything = repository::list_deleted_all(&conn, 1000, 0).unwrap();
+
+    assert_eq!(first.len(), 200, "the first page is a full page");
+    assert_eq!(second.len(), 50, "the rest follows it");
+    assert_eq!(everything.len(), 250);
+
+    let first_ids: std::collections::HashSet<&String> = first.iter().map(|t| &t.id).collect();
+    let overlap = second.iter().filter(|t| first_ids.contains(&t.id)).count();
+    assert_eq!(overlap, 0, "the pages repeat tasks");
+}
+
+#[test]
+fn the_trash_reports_the_total_beyond_the_page() {
+    // The header has to state how many are really in the bin. Showing 200
+    // next to "delete everything" is how 300 disappeared behind a dialog
+    // that promised 200.
+    let mut conn = open_test_db();
+    let tab = repository::ensure_default_tab(&conn).unwrap();
+    for n in 0..250 {
+        let task = repository::create_task(
+            &mut conn,
+            &format!("Задача {n}"),
+            None,
+            Some(&tab.id),
+            false,
+        )
+        .unwrap();
+        repository::soft_delete_task(&mut conn, &task.id).unwrap();
+    }
+
+    let page = repository::list_deleted_all(&conn, 200, 0).unwrap();
+    let total = repository::count_deleted(&conn).unwrap();
+
+    assert_eq!(page.len(), 200);
+    assert_eq!(total, 250, "the count must see past the page");
+}
+
+#[test]
+fn an_empty_trash_counts_zero() {
+    let conn = open_test_db();
+    assert_eq!(repository::count_deleted(&conn).unwrap(), 0);
+    assert!(repository::list_deleted_all(&conn, 200, 0)
+        .unwrap()
+        .is_empty());
+    // An offset past the end is not an error, just an empty window.
+    assert!(repository::list_deleted_all(&conn, 200, 9999)
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
 fn restoring_a_parent_brings_back_children_deleted_before_it() {
     let mut conn = open_test_db();
     let parent = repository::create_task(&mut conn, "Parent", None, None, true).unwrap();
@@ -331,7 +411,7 @@ fn restoring_a_parent_brings_back_children_deleted_before_it() {
     assert_eq!(children.len(), 1);
     assert_eq!(children[0].id, child.id);
     assert_eq!(children[0].title, "Gone");
-    assert!(repository::list_deleted_all(&conn, 200).unwrap().is_empty());
+    assert!(repository::list_deleted_all(&conn, 200, 0).unwrap().is_empty());
 }
 
 #[test]
@@ -1088,7 +1168,7 @@ fn deleting_a_tab_takes_its_tasks_to_the_trash_and_keeps_the_last_one() {
         "the neighbouring tab stayed empty"
     );
     assert_eq!(
-        repository::list_deleted_all(&conn, 50).unwrap().len(),
+        repository::list_deleted_all(&conn, 50, 0).unwrap().len(),
         1,
         "the task is recoverable from the trash"
     );
@@ -2080,7 +2160,7 @@ fn trash_lists_subtasks_and_restore_brings_them_back() {
     repository::soft_delete_task(&mut conn, &root.id).unwrap();
 
     // The trash shows what is really in it: the parent *and* its subtasks.
-    let deleted = repository::list_deleted_all(&conn, 200).unwrap();
+    let deleted = repository::list_deleted_all(&conn, 200, 0).unwrap();
     assert_eq!(deleted.len(), 3, "1 parent + 2 subtasks");
     assert!(deleted.iter().any(|t| t.id == root.id));
     assert!(deleted.iter().any(|t| t.id == a.id));
@@ -2089,7 +2169,7 @@ fn trash_lists_subtasks_and_restore_brings_them_back() {
     // Restoring the parent brings the whole tree back.
     let restored = repository::restore_task(&mut conn, &root.id).unwrap();
     assert_eq!(restored.len(), 3, "the parent and both subtasks");
-    assert!(repository::list_deleted_all(&conn, 200).unwrap().is_empty());
+    assert!(repository::list_deleted_all(&conn, 200, 0).unwrap().is_empty());
     assert_eq!(repository::list_subtasks(&conn, &root.id).unwrap().len(), 2);
     let _ = b;
 }
@@ -2112,7 +2192,7 @@ fn restoring_a_subtask_on_its_own_promotes_it_to_a_root_task() {
     assert!(active_task(&conn, &child.id).deleted_at.is_none());
     assert_eq!(repository::list_roots(&conn, true, None).unwrap().len(), 1);
     // Only the parent is left in the trash.
-    assert_eq!(repository::list_deleted_all(&conn, 200).unwrap().len(), 1);
+    assert_eq!(repository::list_deleted_all(&conn, 200, 0).unwrap().len(), 1);
     let _ = root;
 }
 
@@ -2137,7 +2217,7 @@ fn purge_all_handles_the_real_trash_shapes() {
     let c1 = repository::create_task(&mut conn, "C1", Some(&c.id), None, true).unwrap();
     repository::soft_delete_task(&mut conn, &c1.id).unwrap();
 
-    let before = repository::list_deleted_all(&conn, 200).unwrap().len();
+    let before = repository::list_deleted_all(&conn, 200, 0).unwrap().len();
     // B1 is not in the trash any more — that is exactly why it is invisible.
     assert_eq!(before, 5, "A, A1, A2, B and C1");
 
@@ -2146,7 +2226,7 @@ fn purge_all_handles_the_real_trash_shapes() {
         removed, 6,
         "the five visible rows plus the invisible orphan"
     );
-    assert!(repository::list_deleted_all(&conn, 200).unwrap().is_empty());
+    assert!(repository::list_deleted_all(&conn, 200, 0).unwrap().is_empty());
     // Only C survives: A and B were in the trash, B1 went with its parent.
     let survivors: Vec<String> = repository::list_roots(&conn, true, None)
         .unwrap()
