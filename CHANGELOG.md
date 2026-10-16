@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/zeroscrypt/QuiTa/compare/v1.4.0...v1.4.1) (2026-10-16)
+
+
+### Исправлено
+
+* **выпуск:** слияние релизного PR нужно повторить, GitHub не успевает ([#34](https://github.com/zeroscrypt/QuiTa/issues/34)) ([16e6426](https://github.com/zeroscrypt/QuiTa/commit/16e64264378f88d96df5586cd915c619bf73c648))
+
 ## [1.4.0](https://github.com/zeroscrypt/QuiTa/compare/v1.3.2...v1.4.0) (2026-10-16)
 
 

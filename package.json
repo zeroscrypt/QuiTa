@@ -1,7 +1,7 @@
 {
   "name": "quita",
   "private": true,
-  "version": "1.4.0",
+  "version": "1.4.1",
   "type": "module",
   "description": "QuiTa — lightweight cross-platform task manager (Tauri 2 + Svelte + TypeScript + Rust + SQLite)",
   "scripts": {
