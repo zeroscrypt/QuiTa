@@ -190,8 +190,22 @@ jobs:
 
       # rustls 0.23.45 sat in the lock file with four advisories through months
       # of green runs: nothing in the code had changed, only the advisory
-      # database. The two ignored entries are build-time crates with no fix
-      # available; both are recorded in docs/DISTRIBUTION.md.
+      # database. The ignored entries are recorded in docs/DISTRIBUTION.md with
+      # the reason for each; none of them has a fix that does not mean moving the
+      # whole framework to a release candidate.
+      #
+      # `zip` 4.6.1 is the hard one: three real advisories from October 2026
+      # (symlinks escaping the destination directory, and SUID bits preserved
+      # through extraction), fixed only in 9.x. It is reached through
+      # `tauri-plugin-updater`, and the newest 2.x still requires 4.x — leaving
+      # the 3.0 alpha, which drags Tauri itself into a release candidate.
+      #
+      # The path that uses it does not run here, and that is checked rather than
+      # assumed: `zip` is used in exactly one place in the plugin, inside the
+      # Windows updater and only when the downloaded asset *is* a zip archive.
+      # Our releases ship an `.msi` and its signature, and the signature is
+      # verified before anything is extracted — so the vulnerable branch is
+      # unreachable on our platforms and our assets.
       #
       # This is a command, not rustsec/audit-check, and the difference is the
       # whole point. That action also publishes its result as a check run, which
@@ -208,7 +222,13 @@ jobs:
       - name: Audit dependencies
         # Cargo.lock lives next to the crate, not at the repository root.
         working-directory: src-tauri
-        run: cargo audit --ignore RUSTSEC-2024-0370 --ignore RUSTSEC-2024-0429
+        run: >-
+          cargo audit
+          --ignore RUSTSEC-2024-0370
+          --ignore RUSTSEC-2024-0429
+          --ignore RUSTSEC-2026-0367
+          --ignore RUSTSEC-2026-0368
+          --ignore RUSTSEC-2026-0369
 
   tauri-build-macos:
     needs: changes
