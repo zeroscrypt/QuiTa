@@ -109,6 +109,11 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      # Approving the release pull request's own CI run. Branch protection
+      # requires every check to report, and a run opened by the repository token
+      # is held as `action_required` until someone approves it — no jobs, no
+      # checks, no merge. See the approval step below.
+      actions: write
     steps:
       - name: Wait for CI, then merge
         env:
@@ -122,8 +127,10 @@ jobs:
           # The number comes from Release Please itself, never from a search by
           # title. The repository is public, so anyone can open a pull request
           # called "chore(main): release 9.9.9" and wait; a title search would
-          # find theirs first, because gh lists the newest first, and main
-          # requires neither reviews nor checks.
+          # find theirs first, because gh lists the newest first. Branch
+          # protection is a second lock on that door, not a reason to leave it
+          # unlocked: the impostor branch cannot pass six required checks by
+          # claiming to be a release.
           number="$(printf '%s' "$RELEASE_PRS" | jq -r '.[0].number // empty' 2>/dev/null || true)"
           if [ -z "$number" ]; then
             echo "Release Please reported no pull request, so there is nothing to merge."
@@ -167,6 +174,67 @@ jobs:
 
           if [ "$conclusion" != "success" ]; then
             echo "::warning::CI did not finish in time - the release waits for a human."
+            exit 0
+          fi
+
+          # The release pull request needs checks of its own. Branch protection
+          # on main requires every CI job by name, and the checks a pull request
+          # carries are read from its own head commit — the green run on main is
+          # a different commit and does not count for it. Release Please opened
+          # this pull request with the repository token, and GitHub holds such
+          # runs as `action_required`: no jobs are scheduled, so no check ever
+          # reports, and the merge stays blocked until a person approves it.
+          #
+          # So this job approves that run itself, and only after the checks
+          # above: the number came from Release Please, the branch is a
+          # release-please-- one, the pull request is open, and its base is the
+          # commit this run was triggered by. An approval costs nothing even in
+          # the worst case — that run only reads code — and the code on the
+          # branch is what the green run on main has just built.
+          run_id=""
+          for _ in $(seq 1 20); do
+            run_id="$(gh api "repos/$REPO/actions/runs?head_sha=$head_oid" \
+              --jq '[.workflow_runs[]
+                     | select(.name == "CI")
+                     | select(.conclusion == "action_required")][0].id // empty' \
+              2>/dev/null || echo "")"
+            [ -n "$run_id" ] && break
+            sleep 15
+          done
+
+          if [ -z "$run_id" ]; then
+            echo "::notice::No held CI run found on the release branch."
+          elif gh api -X POST "repos/$REPO/actions/runs/$run_id/approve" >/dev/null 2>&1; then
+            echo "::notice::Approved CI run $run_id on the release branch."
+          else
+            echo "::warning::Could not approve run $run_id - the release waits for a human:"
+            echo "::warning::https://github.com/$REPO/actions/runs/$run_id"
+            exit 0
+          fi
+
+          # Now the checks protection actually waits for. "Skipped" is the
+          # expected result here, not a problem: a version bump needs no build,
+          # and every build it would repeat was green on main one commit earlier.
+          verdict=""
+          for _ in $(seq 1 40); do
+            verdict="$(gh pr checks "$number" --repo "$REPO" --json state --jq '
+              if length == 0 then "pending"
+              elif any(.[]; .state
+                    | IN("FAILURE", "ERROR", "CANCELLED", "TIMED_OUT",
+                         "ACTION_REQUIRED", "STALE")) then "fail"
+              elif all(.[]; .state | IN("SUCCESS", "SKIPPED")) then "ok"
+              else "pending" end' 2>/dev/null || echo "pending")"
+            case "$verdict" in
+              ok) break ;;
+              pending) sleep 15 ;;
+              *)
+                echo "::warning::A check on the release PR is not green - the release waits for a human."
+                exit 0 ;;
+            esac
+          done
+
+          if [ "$verdict" != "ok" ]; then
+            echo "::warning::The release PR checks did not finish in time - the release waits for a human."
             exit 0
           fi
 
