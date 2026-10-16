@@ -19,6 +19,7 @@
   import { t } from '$i18n';
   import type { TaskNode } from '$lib/types';
   import { newestRowIndex, scrollTopForTarget } from '$lib/scroll';
+  import { isTabShortcut, tabForDigit } from '$lib/tabShortcut';
 
   onMount(async () => {
     void uiStore.init();
@@ -41,6 +42,40 @@
   });
 
   const searching = $derived(taskStore.searchQuery.trim().length > 0);
+
+  /**
+   * ⌘1..9 on macOS, Ctrl+1..9 elsewhere — the binding every app with tabs
+   * already uses, so nobody has to look it up. Both modifiers are accepted on
+   * every platform: they collide with nothing here, and branching on the
+   * operating system would need platform detection this app has no reason to
+   * carry.
+   *
+   * Handled in the window rather than registered as a global shortcut on
+   * purpose. A global Ctrl+3 would follow the user into their browser and
+   * switch tabs in an app that is not in front.
+   */
+  function onWindowKeydown(event: KeyboardEvent) {
+    if (!isTabShortcut(event)) return;
+    // A dialog owns the keyboard while it is open.
+    if (
+      uiStore.settingsOpen ||
+      uiStore.aboutOpen ||
+      uiStore.confirmDelete ||
+      uiStore.confirmTabDelete
+    ) {
+      return;
+    }
+
+    const target = tabForDigit(tabStore.tabs, Number(event.key));
+    if (!target) return;
+
+    event.preventDefault();
+    if (target !== tabStore.activeTabId) tabStore.select(target);
+    // Either way the caret lands in the task input, so the next keystroke is a
+    // task in the tab just selected. Re-selecting the current tab still focuses
+    // it — that is the fastest way back to typing after clicking a list row.
+    uiStore.requestFocusInput();
+  }
 
   const searchEmpty = $derived(
     searching &&
@@ -120,6 +155,8 @@
     });
   });
 </script>
+
+<svelte:window onkeydown={onWindowKeydown} />
 
 <div class="app-shell">
   <AppHeader />
