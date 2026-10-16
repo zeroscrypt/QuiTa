@@ -34,10 +34,16 @@ pub async fn reorder_tabs(
     repository::list_tabs(&conn)
 }
 
-/// Deletes a tab together with its tasks, both through the trash.
+/// Hides a tab and remembers its tasks, leaving the tasks where they are.
+///
+/// The undo window is what makes this honest: the tasks move to the trash when
+/// the window closes, not before it, so quitting the app mid-window leaves
+/// something you can still take back. `finalize_tab_deletion` does the second
+/// half; a restart calls `sweep_pending_tab_deletions` for the app that closed
+/// instead of reporting.
 ///
 /// The result carries everything the undo needs, so the UI does not have to
-/// guess which tasks went with the tab.
+/// guess which tasks were in the tab.
 #[tauri::command]
 pub async fn delete_tab(
     id: TaskId,
@@ -45,6 +51,26 @@ pub async fn delete_tab(
 ) -> Result<crate::domain::task::TabDeletion, TaskError> {
     let mut conn = db.lock().map_err(TaskError::Internal)?;
     repository::delete_tab(&mut conn, &id)
+}
+
+/// Sends a tab's tasks to the trash once its undo window has passed.
+#[tauri::command]
+pub async fn finalize_tab_deletion(
+    id: TaskId,
+    db: State<'_, Db>,
+) -> Result<Vec<crate::domain::task::Task>, TaskError> {
+    let mut conn = db.lock().map_err(TaskError::Internal)?;
+    repository::finalize_tab_deletion(&mut conn, &id)
+}
+
+/// Finishes a tab deletion whose undo window was cut short by the app closing,
+/// so a tab hidden ten seconds before quitting does not stay hidden for ever.
+#[tauri::command]
+pub async fn sweep_pending_tab_deletions(
+    db: State<'_, Db>,
+) -> Result<Vec<crate::domain::task::Task>, TaskError> {
+    let mut conn = db.lock().map_err(TaskError::Internal)?;
+    repository::sweep_pending_tab_deletions(&mut conn)
 }
 
 /// Takes back a tab deletion within the undo window.

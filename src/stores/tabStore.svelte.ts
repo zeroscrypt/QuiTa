@@ -112,10 +112,12 @@ class TabStore {
   }
 
   /**
-   * Deletes the tab with its tasks and returns what the undo needs.
+   * Hides the tab and returns what the undo needs. Its tasks stay where they
+   * are until the undo window closes — see `finalize`, which the notice calls
+   * when the countdown reaches zero.
    *
-   * The tasks go to the trash rather than to a neighbour: handing them over
-   * read as the tab's notes quietly leaking into the tab on the left.
+   * The tasks are not handed to a neighbouring tab: that read as the tab's notes
+   * quietly leaking into the tab on the left.
    */
   async remove(tabId: TaskId): Promise<TabDeletion | null> {
     if (this.tabs.length <= 1) return null; // the last tab is never removed
@@ -127,7 +129,19 @@ class TabStore {
     return deletion;
   }
 
-  /** Puts a deleted tab and its tasks back during the undo window. */
+  /**
+   * The second half of the deletion: now the window has passed, the tab's tasks
+   * go to the trash.
+   *
+   * Safe to call twice — the second call finds no live tasks and returns
+   * nothing — which matters because a timer that fires while the app is closing
+   * can easily run twice.
+   */
+  async finalize(deletion: TabDeletion): Promise<void> {
+    await tabService.finalizeTabDeletion(deletion.tab.id);
+  }
+
+  /** Puts a hidden tab and its tasks back during the undo window. */
   async restore(deletion: TabDeletion): Promise<void> {
     await tabService.restoreDeletedTab(deletion.tab.id, deletion.taskIds);
     await this.reload();

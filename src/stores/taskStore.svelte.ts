@@ -2,6 +2,7 @@ import { untrack } from 'svelte';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { SearchResult, Task, TaskId, TaskNode } from '$lib/types';
 import * as taskService from '$services/taskService';
+import * as tabService from '$services/tabService';
 import { t } from '$i18n';
 import { truncate } from '$domain/taskRules';
 import { settingsStore } from './settingsStore.svelte';
@@ -64,6 +65,9 @@ class TaskStore {
     try {
       await taskService.purgeCompletedTasks();
       await taskService.purgeTrashByAge();
+      // A tab hidden inside its undo window would stay hidden for ever if the
+      // app closed before the window closed with it.
+      await tabService.sweepPendingTabDeletions();
     } catch (e) {
       this.showError(e);
     }

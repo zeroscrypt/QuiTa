@@ -128,7 +128,7 @@ Windows, `.AppImage` + `.deb` on Linux.
 
 ## Features
 
-- [x] **Tabs as projects** — create, rename by double click, reorder by drag, automatic colour from a 10-colour palette. Deleting a tab asks first, takes its tasks to the trash, and one click undoes it.
+- [x] **Tabs as projects** — create, rename by double click, reorder by drag, automatic colour from a 10-colour palette. Deleting a tab asks first and one click undoes it: the tab goes first, and its tasks wait out ten seconds before following it into the trash.
 - [x] **Subtasks** — exactly one level deep, and that is the limit.
 - [x] **Due dates** — calendar dates with no timezone shift, overdue tasks highlighted, chips for today / tomorrow.
 - [x] **Comments** — autosaved, opened from the button next to a task.
@@ -300,8 +300,8 @@ therefore testable without a window.
 | `pnpm tauri dev` | Run with hot reload |
 | `pnpm tauri build` | Installers for the current platform |
 | `pnpm check` | Svelte and TypeScript types |
-| `pnpm test` | 152 unit tests |
-| `cargo test --manifest-path src-tauri/Cargo.toml` | 149 Rust tests (40 unit + 105 integration against a real database + 4 guarding the docs) |
+| `pnpm test` | 157 unit tests |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | 153 Rust tests (40 unit + 109 integration against a real database + 4 guarding the docs) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Lints, errors as warnings |
 | `cargo audit` | Vulnerabilities in dependencies |
 
