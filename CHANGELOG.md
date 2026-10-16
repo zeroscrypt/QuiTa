@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.2.2](https://github.com/zeroscrypt/QuiTa/compare/v1.2.1...v1.2.2) (2026-10-16)
+
+
+### Новое
+
+* корзина держит ограниченное число задач и говорит, что вытеснила ([8f060c9](https://github.com/zeroscrypt/QuiTa/commit/8f060c912841650f7d89c5318999e8171d559976))
+* Escape разворачивает слои по одному, фокус возвращается на ввод ([e26fa9f](https://github.com/zeroscrypt/QuiTa/commit/e26fa9fac6dd67ef4c3e40c1c83626e75a440632))
+* переключение вкладок цифрами с фокусом на поле ввода ([262ce19](https://github.com/zeroscrypt/QuiTa/commit/262ce194fcdf1f5749cc03c02d4f2e1d29d0858a))
+* установщик проверяет подпись, а не только сумму ([57d42fa](https://github.com/zeroscrypt/QuiTa/commit/57d42faaa870f0e44c88f2fdecb35edefe3632dd))
+* фокус не уходит из диалога ([cd883c2](https://github.com/zeroscrypt/QuiTa/commit/cd883c22ba9124825d35c5ced00c175442cb9a41))
+* меню и частично выполненные задачи доступны с клавиатуры ([1e97f15](https://github.com/zeroscrypt/QuiTa/commit/1e97f1546dd85b6e5dfea4251bcbc30c6fea70cd))
+
+### Исправлено
+
+* кнопка «Отмена» закрывает диалог удаления вкладки ([52ec2d8](https://github.com/zeroscrypt/QuiTa/commit/52ec2d895a7c828a31072bbf82feac06d650c17d))
+* корзина показывает настоящее число и достаёт всё, что в ней есть ([07f954a](https://github.com/zeroscrypt/QuiTa/commit/07f954aae945c0b438f2866be2f48e79c86e52ed))
+* отказы интерфейса больше не остаются без объяснения ([d89ea3a](https://github.com/zeroscrypt/QuiTa/commit/d89ea3a3a99fdfe347152e8e3a1dabbc03aa0e31))
+* три способа потерять задачу из вида ([b8effd2](https://github.com/zeroscrypt/QuiTa/commit/b8effd27ced229aa0d976725577333124d152a81))
+* контекстное меню задачи больше не падает ([e1e498f](https://github.com/zeroscrypt/QuiTa/commit/e1e498fac591eeecb016d799cd5efa2cc48086f1))
+* токен в CI ограничен правами на чтение ([1967f01](https://github.com/zeroscrypt/QuiTa/commit/1967f01712a626ee8682f4917a956b9af831bd97))
+
 ## [1.2.1](https://github.com/zeroscrypt/QuiTa/compare/v1.2.0...v1.2.1) (2026-10-15)
 
 
