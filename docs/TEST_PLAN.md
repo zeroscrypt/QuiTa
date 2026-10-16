@@ -15,7 +15,7 @@
 | Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 40 |
 | Rust integration | то же | 112 |
 | Rust документация | то же (`tests/documentation.rs`) | 4 |
-| TypeScript | `pnpm test` | 159 |
+| TypeScript | `pnpm test` | 164 |
 
 Числа берутся из фактического прогона. Если они разошлись с таблицей —
 значит, тесты забыли пересчитать, и это такое же расхождение кода и
@@ -285,6 +285,16 @@ SSR-рендер компонента задачи — проверяет кон
 | `hides the right fade at the very end` | Правый градиент в конце |
 | `moves roughly one screen per click` | Шаг кнопки прокрутки |
 
+### `tests/appShortcut.test.ts`
+
+| Тест | Что проверяет |
+|------|---------------|
+| `reads the three bindings with either modifier` | ⌘ и Ctrl на всех платформах дают одно и то же |
+| `ignores the letters without a modifier` | Буква в названии задачи не создаёт вкладку |
+| `leaves Alt and Shift alone` | ⌥⌘T и ⌘⇧F не перехватываются |
+| `does not claim the digits or anything else` | Цифры остаются за полосой вкладок |
+| `accepts a capital letter from a held Shift-free layout difference` | Зажатый Caps Lock не ломает сочетание |
+
 ### `tests/tabDeletion.test.ts`
 
 | Тест | Что проверяет |
@@ -423,7 +433,7 @@ GitHub Actions (`.github/workflows/ci.yml`):
 
 | Проверка | Команда | Результат |
 |----------|---------|-----------|
-| Тесты UI | `pnpm test` | 159 из 159 пройдено (21 файл) |
+| Тесты UI | `pnpm test` | 164 из 164 пройдено (22 файла) |
 | Тесты Rust | `cargo test` | 40 unit + 112 интеграционных + 4 на документацию |
 
 Более ранний прогон, на котором сняты остальные строки таблицы:

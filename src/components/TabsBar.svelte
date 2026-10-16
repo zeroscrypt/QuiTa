@@ -114,6 +114,12 @@
     queueMicrotask(() => inputEl?.focus());
   }
 
+  // The shortcut opens the same field the "+" button opens. Zero is the initial
+  // value, and acting on it would put every launch straight into an editor.
+  $effect(() => {
+    if (uiStore.newTabRequest > 0) startCreate();
+  });
+
   async function commit() {
     const name = normalizeTitle(draft ?? '');
     const target = editing;

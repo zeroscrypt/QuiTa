@@ -101,7 +101,7 @@
 
   <button
     class="icon-button settings-button"
-    onclick={() => (uiStore.settingsOpen = true)}
+    onclick={() => uiStore.openSettings()}
     aria-label={t('settings.title')}
     title={t('settings.title')}
   >
