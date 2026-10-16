@@ -411,7 +411,9 @@ fn restoring_a_parent_brings_back_children_deleted_before_it() {
     assert_eq!(children.len(), 1);
     assert_eq!(children[0].id, child.id);
     assert_eq!(children[0].title, "Gone");
-    assert!(repository::list_deleted_all(&conn, 200, 0).unwrap().is_empty());
+    assert!(repository::list_deleted_all(&conn, 200, 0)
+        .unwrap()
+        .is_empty());
 }
 
 #[test]
@@ -2169,7 +2171,9 @@ fn trash_lists_subtasks_and_restore_brings_them_back() {
     // Restoring the parent brings the whole tree back.
     let restored = repository::restore_task(&mut conn, &root.id).unwrap();
     assert_eq!(restored.len(), 3, "the parent and both subtasks");
-    assert!(repository::list_deleted_all(&conn, 200, 0).unwrap().is_empty());
+    assert!(repository::list_deleted_all(&conn, 200, 0)
+        .unwrap()
+        .is_empty());
     assert_eq!(repository::list_subtasks(&conn, &root.id).unwrap().len(), 2);
     let _ = b;
 }
@@ -2192,7 +2196,10 @@ fn restoring_a_subtask_on_its_own_promotes_it_to_a_root_task() {
     assert!(active_task(&conn, &child.id).deleted_at.is_none());
     assert_eq!(repository::list_roots(&conn, true, None).unwrap().len(), 1);
     // Only the parent is left in the trash.
-    assert_eq!(repository::list_deleted_all(&conn, 200, 0).unwrap().len(), 1);
+    assert_eq!(
+        repository::list_deleted_all(&conn, 200, 0).unwrap().len(),
+        1
+    );
     let _ = root;
 }
 
@@ -2226,7 +2233,9 @@ fn purge_all_handles_the_real_trash_shapes() {
         removed, 6,
         "the five visible rows plus the invisible orphan"
     );
-    assert!(repository::list_deleted_all(&conn, 200, 0).unwrap().is_empty());
+    assert!(repository::list_deleted_all(&conn, 200, 0)
+        .unwrap()
+        .is_empty());
     // Only C survives: A and B were in the trash, B1 went with its parent.
     let survivors: Vec<String> = repository::list_roots(&conn, true, None)
         .unwrap()
