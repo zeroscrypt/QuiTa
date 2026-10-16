@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/zeroscrypt/QuiTa/compare/v1.3.0...v1.3.1) (2026-10-16)
+
+
+### Исправлено
+
+* **выпуск:** сторож ждёт релиз, а не требует его через две секунды ([#27](https://github.com/zeroscrypt/QuiTa/issues/27)) ([47ea3a1](https://github.com/zeroscrypt/QuiTa/commit/47ea3a191634ce0736e3b47f2e5af26843696695))
+
 ## [1.3.0](https://github.com/zeroscrypt/QuiTa/compare/v1.2.2...v1.3.0) (2026-10-16)
 
 
