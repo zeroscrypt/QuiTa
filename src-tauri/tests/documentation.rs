@@ -169,6 +169,9 @@ fn the_test_counts_in_the_docs_match_the_code() {
     for (label, actual) in [
         ("Rust unit", rust_unit),
         ("Rust integration", rust_integration),
+        // The docs half was the one number the guard did not look at, and it
+        // sat at 3 while there were already four of these tests.
+        ("Rust документация", rust_docs),
         ("TypeScript", ts),
     ] {
         assert!(

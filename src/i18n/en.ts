@@ -178,7 +178,7 @@ export const en: Record<string, string> = {
     "The parent checkbox affects only the parent: subtasks keep their state and reopening changes nothing.",
   "settings.autoDelete": "Auto-delete completed",
   "settings.autoDeleteHint":
-    "Completed tasks are deleted on the next app launch once the given number of days has passed. Leave empty to keep them.",
+    "A task moves to the trash on the next launch once it and all its subtasks are done and the last of them was closed the given number of days ago. Leave empty to keep them.",
   "settings.autoDeleteDays": "After how many days",
   "settings.trashLimit": "How many tasks the trash keeps",
   "settings.trashLimitHint":

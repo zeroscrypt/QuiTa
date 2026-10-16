@@ -13,8 +13,8 @@
 | Набор | Команда | Тестов |
 |-------|---------|--------|
 | Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 40 |
-| Rust integration | то же | 98 |
-| Rust документация | то же (`tests/documentation.rs`) | 3 |
+| Rust integration | то же | 100 |
+| Rust документация | то же (`tests/documentation.rs`) | 4 |
 | TypeScript | `pnpm test` | 147 |
 
 Числа берутся из фактического прогона. Если они разошлись с таблицей —
@@ -84,6 +84,14 @@
 | `restore_of_subtask_with_deleted_parent_promotes_it` | Подзадача с удалённым родителем восстанавливается как корневая |
 | `trash_lists_subtasks_and_restore_brings_them_back` | Корзина показывает подзадачи рядом с родителем |
 | `restoring_a_subtask_on_its_own_promotes_it_to_a_root_task` | Отдельное восстановление подзадачи поднимает её на верхний уровень |
+
+### Автоочистка завершённых
+
+| Тест | Что проверяет |
+|------|---------------|
+| `purge_moves_a_finished_tree_to_the_trash` | Закрытое дерево уходит в корзину вместе с подзадачами, а не исчезает |
+| `purge_waits_for_the_last_closure_in_the_tree` | Отсчёт идёт от последнего завершения в дереве |
+| `purge_leaves_a_tree_with_open_work_alone` | Незавершённая подзадача удерживает дерево, закрытая подзадача не уходит от открытого родителя |
 
 ### Сроки
 
@@ -388,7 +396,7 @@ GitHub Actions (`.github/workflows/ci.yml`):
 | Проверка | Команда | Результат |
 |----------|---------|-----------|
 | Тесты UI | `pnpm test` | 147 из 147 пройдено (20 файлов) |
-| Тесты Rust | `cargo test` | 40 unit + 98 интеграционных + 4 на документацию |
+| Тесты Rust | `cargo test` | 40 unit + 100 интеграционных + 4 на документацию |
 
 Более ранний прогон, на котором сняты остальные строки таблицы:
 

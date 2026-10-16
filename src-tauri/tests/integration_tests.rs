@@ -1018,49 +1018,125 @@ fn cascade_setting_round_trips_through_settings() {
 }
 
 #[test]
-fn purge_removes_completed_tasks_older_than_retention_with_children() {
+fn purge_moves_a_finished_tree_to_the_trash() {
     let mut conn = open_test_db();
-    let old = repository::create_task(&mut conn, "Старая", None, None, true).unwrap();
-    let old_child =
-        repository::create_task(&mut conn, "Её подзадача", Some(&old.id), None, true).unwrap();
-    let fresh = repository::create_task(&mut conn, "Свежая", None, None, true).unwrap();
-    let open = repository::create_task(&mut conn, "Открытая", None, None, true).unwrap();
+    let root = repository::create_task(&mut conn, "Закрытая", None, None, true).unwrap();
+    let first = repository::create_task(&mut conn, "Первая", Some(&root.id), None, true).unwrap();
+    let second = repository::create_task(&mut conn, "Вторая", Some(&root.id), None, true).unwrap();
 
-    repository::toggle_completion(&mut conn, &old.id, true).unwrap();
-    repository::toggle_completion(&mut conn, &fresh.id, true).unwrap();
-
-    // Age both completed tasks by different amounts.
+    // Closing the parent closes the tree, so one timestamp ages it all.
+    repository::toggle_completion(&mut conn, &root.id, true).unwrap();
     conn.execute(
-        "UPDATE tasks SET completed_at = datetime('now', '-40 days') WHERE id = ?1",
-        [&old.id],
-    )
-    .unwrap();
-    conn.execute(
-        "UPDATE tasks SET completed_at = datetime('now', '-2 days') WHERE id = ?1",
-        [&fresh.id],
+        "UPDATE tasks SET completed_at = datetime('now', '-40 days') WHERE id = ?1 OR parent_id = ?1",
+        [&root.id],
     )
     .unwrap();
 
-    let purged = repository::purge_completed_tasks(&mut conn, 30).unwrap();
-    assert_eq!(purged.len(), 2, "the old task and its subtask are purged");
+    let moved = repository::purge_completed_tasks(&mut conn, 30).unwrap();
+    assert_eq!(moved.len(), 3, "родитель уходит вместе с подзадачами");
+    assert_eq!(moved[0].id, root.id, "родитель идёт первым");
 
     let remaining: Vec<String> = repository::list_roots(&conn, true, None)
         .unwrap()
         .into_iter()
         .map(|t| t.title)
         .collect();
-    assert!(remaining.contains(&"Свежая".to_string()));
-    assert!(remaining.contains(&"Открытая".to_string()));
-    assert!(!remaining.contains(&"Старая".to_string()));
-    assert!(repository::list_subtasks(&conn, &old.id)
-        .unwrap()
-        .is_empty());
+    assert!(!remaining.contains(&"Закрытая".to_string()));
+
+    // Into the trash, not into nothing: the move can be undone.
+    let trash = repository::list_deleted_all(&conn, 50, 0).unwrap();
+    for id in [&root.id, &first.id, &second.id] {
+        assert!(
+            trash.iter().any(|task| &task.id == id),
+            "{id} должен лежать в корзине"
+        );
+    }
 
     // A non-positive retention disables the cleanup entirely.
     assert!(repository::purge_completed_tasks(&mut conn, 0)
         .unwrap()
         .is_empty());
-    let _ = (open, old_child);
+}
+
+#[test]
+fn purge_waits_for_the_last_closure_in_the_tree() {
+    let mut conn = open_test_db();
+    let root = repository::create_task(&mut conn, "Родитель", None, None, true).unwrap();
+    let child = repository::create_task(&mut conn, "Поздняя", Some(&root.id), None, true).unwrap();
+    repository::toggle_completion(&mut conn, &root.id, true).unwrap();
+
+    // The parent was closed long ago, the work under it only two days ago.
+    conn.execute(
+        "UPDATE tasks SET completed_at = datetime('now', '-40 days') WHERE id = ?1",
+        [&root.id],
+    )
+    .unwrap();
+    conn.execute(
+        "UPDATE tasks SET completed_at = datetime('now', '-2 days') WHERE id = ?1",
+        [&child.id],
+    )
+    .unwrap();
+
+    assert!(
+        repository::purge_completed_tasks(&mut conn, 30)
+            .unwrap()
+            .is_empty(),
+        "отсчёт идёт от последнего завершения в дереве, а не от первого"
+    );
+}
+
+#[test]
+fn purge_leaves_a_tree_with_open_work_alone() {
+    let mut conn = open_test_db();
+    let root = repository::create_task(&mut conn, "Родитель", None, None, true).unwrap();
+    let child =
+        repository::create_task(&mut conn, "Ещё в работе", Some(&root.id), None, true).unwrap();
+    repository::toggle_completion(&mut conn, &root.id, true).unwrap();
+    // Taking the checkbox off a subtask leaves the parent closed — the row then
+    // reads "partly done". That is work in progress, and the rule waits for it
+    // instead of carrying it off with the parent.
+    repository::toggle_completion(&mut conn, &child.id, false).unwrap();
+    conn.execute(
+        "UPDATE tasks SET completed_at = datetime('now', '-40 days') WHERE id = ?1",
+        [&root.id],
+    )
+    .unwrap();
+
+    assert!(
+        repository::purge_completed_tasks(&mut conn, 30)
+            .unwrap()
+            .is_empty(),
+        "дерево с незавершённой подзадачей остаётся на месте"
+    );
+
+    // The mirror case: a closed subtask never leaves while its parent is open.
+    // Only whole trees travel, so a child cannot be taken away from work that
+    // is still going on.
+    let open_root = repository::create_task(&mut conn, "Открытый", None, None, true).unwrap();
+    let done_child =
+        repository::create_task(&mut conn, "Закрытая", Some(&open_root.id), None, true).unwrap();
+    repository::toggle_completion(&mut conn, &done_child.id, true).unwrap();
+    conn.execute(
+        "UPDATE tasks SET completed_at = datetime('now', '-40 days') WHERE id = ?1",
+        [&done_child.id],
+    )
+    .unwrap();
+
+    assert!(repository::purge_completed_tasks(&mut conn, 30)
+        .unwrap()
+        .is_empty());
+
+    let titles: Vec<String> = repository::list_roots(&conn, true, None)
+        .unwrap()
+        .into_iter()
+        .map(|t| t.title)
+        .collect();
+    assert!(titles.contains(&"Родитель".to_string()));
+    assert!(titles.contains(&"Открытый".to_string()));
+    assert!(repository::list_subtasks(&conn, &open_root.id)
+        .unwrap()
+        .iter()
+        .any(|t| t.id == done_child.id));
 }
 
 #[test]
