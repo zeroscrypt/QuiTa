@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0](https://github.com/zeroscrypt/QuiTa/compare/v1.3.2...v1.4.0) (2026-10-16)
+
+
+### Новое
+
+* **клавиши:** ⌘T новая вкладка, ⌘F поиск, ⌘S настройки ([#31](https://github.com/zeroscrypt/QuiTa/issues/31)) ([f14495d](https://github.com/zeroscrypt/QuiTa/commit/f14495d5ac30d56667991461c65ed80b72c2f7b0))
+
+
+### Исправлено
+
+* **выпуск:** прогон может и создать релиз, и открыть следующий ([#33](https://github.com/zeroscrypt/QuiTa/issues/33)) ([2d9f199](https://github.com/zeroscrypt/QuiTa/commit/2d9f19905ecd24d49ed6a20b137ab12c3b7fddbd))
+
 ## [1.3.2](https://github.com/zeroscrypt/QuiTa/compare/v1.3.1...v1.3.2) (2026-10-16)
 
 
