@@ -29,6 +29,14 @@ function makeTask(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * What every move into the trash answers: what arrived, and what it pushed out
+ * of the trash to stay within its bound.
+ */
+function sweep(moved: unknown[] = [], evicted: unknown[] = []) {
+  return { deleted: moved, evicted };
+}
+
 describe("taskStore", () => {
   beforeEach(async () => {
     invoke.mockReset();
@@ -200,8 +208,9 @@ describe("taskStore", () => {
       await import("../src/stores/settingsStore.svelte");
     settingsStore.autoDeleteDays = 30;
     invoke.mockReset();
-    invoke.mockResolvedValueOnce([makeTask({ id: "gone" })]); // purge_completed_tasks
+    invoke.mockResolvedValueOnce(sweep([makeTask({ id: "gone" })])); // purge_completed_tasks
     invoke.mockResolvedValueOnce([]); // purge_trash_by_age
+    invoke.mockResolvedValueOnce(sweep()); // sweep_pending_tab_deletions
     invoke.mockResolvedValueOnce([]); // list_tasks
 
     await taskStore.init();
@@ -219,14 +228,47 @@ describe("taskStore", () => {
       await import("../src/stores/settingsStore.svelte");
     settingsStore.trashRetentionDays = null;
     invoke.mockReset();
-    invoke.mockResolvedValueOnce([]); // purge_completed_tasks
+    invoke.mockResolvedValueOnce(sweep()); // purge_completed_tasks
     invoke.mockResolvedValueOnce([makeTask({ id: "forgotten" })]); // purge_trash_by_age
+    invoke.mockResolvedValueOnce(sweep()); // sweep_pending_tab_deletions
     invoke.mockResolvedValueOnce([]); // list_tasks
 
     await taskStore.init();
 
     expect(invoke).toHaveBeenNthCalledWith(2, "purge_trash_by_age");
     settingsStore.trashRetentionDays = null;
+  });
+
+  it("names what an automatic move pushed out of the trash", async () => {
+    // The completion timer and the tab sweep can fill the bin past its bound,
+    // and whatever they push out is gone for good. Silence here would leave the
+    // bound a rule that only holds when nothing else happens.
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
+    invoke.mockReset();
+    // The notice names the task, so the title is what the test watches for.
+    invoke.mockResolvedValueOnce(
+      sweep([], [makeTask({ id: "pushed-out", title: "Вытесненная" })]),
+    );
+    invoke.mockResolvedValueOnce([]); // purge_trash_by_age
+    invoke.mockResolvedValueOnce(sweep()); // sweep_pending_tab_deletions
+    invoke.mockResolvedValueOnce([]); // list_tasks
+
+    await taskStore.init();
+
+    expect(taskStore.notice).toContain("Вытесненная");
+  });
+
+  it("says nothing when no automatic move pushed anything out", async () => {
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
+    invoke.mockReset();
+    invoke.mockResolvedValueOnce(sweep()); // purge_completed_tasks
+    invoke.mockResolvedValueOnce([]); // purge_trash_by_age
+    invoke.mockResolvedValueOnce(sweep()); // sweep_pending_tab_deletions
+    invoke.mockResolvedValueOnce([]); // list_tasks
+
+    await taskStore.init();
+
+    expect(taskStore.notice).toBeNull();
   });
 
   it("passes the cascade setting from the store", async () => {

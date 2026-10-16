@@ -230,7 +230,7 @@ open, `Esc` clears the field, as it always did.
 ### The recycle bin
 
 - [x] **A task goes to the bin together with its subtasks.** A parent cannot stay behind without them: they would hang in lists where nothing shows them.
-- [x] **The bin keeps 200 tasks** — the number is yours to set, and zero turns the rule off. When it is full, deleting another task pushes the oldest out for good, subtasks included, and the rest shift up.
+- [x] **The bin keeps 200 tasks** — the number is yours to set, and zero turns the rule off. When it is full, the next task pushes the oldest out for good, subtasks included, and the rest shift up. The bound holds on every path into the bin — a task you delete, the completion timer, a whole tab — and each of them says what it pushed out.
 - [x] **How long it keeps them is a separate setting** — off by default, because nothing may be deleted on its own. Turn it on and a tree that has sat there that many days leaves on the next launch. The countdown starts at the last deletion in the tree, so a subtask thrown out after its parent gets its full term.
 - [x] **Displacement is announced.** That task did not go by your choice, so the toast names the one that left.
 - [x] **The header shows the real number**, not what fits on screen; the rest comes with "Show more".
@@ -300,8 +300,8 @@ therefore testable without a window.
 | `pnpm tauri dev` | Run with hot reload |
 | `pnpm tauri build` | Installers for the current platform |
 | `pnpm check` | Svelte and TypeScript types |
-| `pnpm test` | 157 unit tests |
-| `cargo test --manifest-path src-tauri/Cargo.toml` | 153 Rust tests (40 unit + 109 integration against a real database + 4 guarding the docs) |
+| `pnpm test` | 159 unit tests |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | 156 Rust tests (40 unit + 112 integration against a real database + 4 guarding the docs) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Lints, errors as warnings |
 | `cargo audit` | Vulnerabilities in dependencies |
 

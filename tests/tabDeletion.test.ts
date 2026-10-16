@@ -140,9 +140,9 @@ describe("starting up", () => {
   it("finishes a tab deletion the app closed in the middle of", async () => {
     const { taskStore } = await import("../src/stores/taskStore.svelte");
     invoke.mockReset();
-    invoke.mockResolvedValueOnce([]); // purge_completed_tasks
+    invoke.mockResolvedValueOnce({ deleted: [], evicted: [] }); // purge_completed_tasks
     invoke.mockResolvedValueOnce([]); // purge_trash_by_age
-    invoke.mockResolvedValueOnce([]); // sweep_pending_tab_deletions
+    invoke.mockResolvedValueOnce({ deleted: [], evicted: [] }); // sweep_pending_tab_deletions
     invoke.mockResolvedValueOnce([]); // list_tasks
 
     await taskStore.init();

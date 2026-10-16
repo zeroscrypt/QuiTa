@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Tab, TabDeletion, Task, TaskId } from "$lib/types";
+import type { DeleteOutcome, Tab, TabDeletion, TaskId } from "$lib/types";
 
 export function listTabs(): Promise<Tab[]> {
   return invoke<Tab[]>("list_tabs");
@@ -37,13 +37,15 @@ export function deleteTab(id: TaskId): Promise<TabDeletion> {
 }
 
 /** Sends a hidden tab's tasks to the trash; called when the window passes. */
-export function finalizeTabDeletion(id: TaskId): Promise<Task[]> {
-  return invoke<Task[]>("finalize_tab_deletion", { id });
+export function finalizeTabDeletion(id: TaskId): Promise<DeleteOutcome> {
+  // Reports what the trash pushed out: a whole tab arriving at once is the
+  // fastest way past the bound, so the rule has to hold here too.
+  return invoke<DeleteOutcome>("finalize_tab_deletion", { id });
 }
 
 /** Finishes a deletion whose window was cut short by the app closing. */
-export function sweepPendingTabDeletions(): Promise<Task[]> {
-  return invoke<Task[]>("sweep_pending_tab_deletions");
+export function sweepPendingTabDeletions(): Promise<DeleteOutcome> {
+  return invoke<DeleteOutcome>("sweep_pending_tab_deletions");
 }
 
 export function restoreDeletedTab(

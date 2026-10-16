@@ -60,14 +60,18 @@ class TaskStore {
 
   async init(): Promise<void> {
     // Apply the retention policies before the first render so the list is
-    // correct. Both are read by the command itself, which does nothing while
-    // the setting is empty.
+    // correct. The commands read the settings themselves and do nothing while
+    // they are empty; the ones that move tasks into the bin also answer what it
+    // had to push out to stay within its bound.
     try {
-      await taskService.purgeCompletedTasks();
+      const finished = await taskService.purgeCompletedTasks();
       await taskService.purgeTrashByAge();
       // A tab hidden inside its undo window would stay hidden for ever if the
       // app closed before the window closed with it.
-      await tabService.sweepPendingTabDeletions();
+      const swept = await tabService.sweepPendingTabDeletions();
+      // Whichever path emptied the bin past its bound, what it pushed out is
+      // gone for good — and this runs before anyone is looking at the screen.
+      this.announceEviction([...finished.evicted, ...swept.evicted]);
     } catch (e) {
       this.showError(e);
     }
@@ -327,8 +331,16 @@ class TaskStore {
    * the user actually deleted is safe in the trash, and a different one is
    * gone. Naming it is the difference between a rule working and a task
    * vanishing without an account of where it went.
+   *
+   * Public because every path into the trash goes through here: a deletion by
+   * hand, the completion timer, and a tab that followed its tasks in. Anything
+   * that pushes the bin over its bound has to name what it pushed out.
    */
-  private announceEviction(evicted: Task[]): void {
+  announceEviction(evicted: Task[]): void {
+    // Called by every path into the trash, so "nothing was pushed out" is the
+    // common answer: it must not produce an announcement, and it must not read
+    // past the end of the list either.
+    if (evicted.length === 0) return;
     const title = truncate(evicted[0].title, 40);
     this.notice =
       evicted.length === 1

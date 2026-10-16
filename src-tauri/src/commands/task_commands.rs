@@ -73,11 +73,16 @@ pub async fn set_task_comment(
     repository::set_comment(&mut conn, &id, comment.as_deref())
 }
 
-/// What a delete did: the tasks it moved to the trash, and what fell out of
-/// the trash because it was full.
+/// What a move into the trash did: the tasks that arrived, and what fell out
+/// because the bin was full.
 ///
 /// Both halves are returned because both are things the user needs to be told
 /// about — the first is visible, the second is gone for good.
+///
+/// Every path that puts tasks in the bin answers with this, not only a deletion
+/// by hand. A tree finished by the timer and the tasks of a deleted tab arrive
+/// in the trash exactly the same way, so the size rule has to hold on all of
+/// them, and what it pushes out has to be named on all of them.
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteOutcome {
@@ -143,16 +148,26 @@ pub async fn count_subtasks(parent_id: TaskId, db: State<'_, Db>) -> Result<i64,
 
 /// Lazily deletes completed tasks older than the configured retention period.
 /// Runs when the UI loads the list, so no background timer is required.
+///
+/// The trash limit is enforced here, exactly as it is after a deletion by hand.
+/// A finished tree arrives in the bin the same way a thrown-away task does, and
+/// the size rule that governs the bin has no exceptions to remember — otherwise
+/// the bin silently grows past its bound the first night the timer fires.
 #[tauri::command]
-pub async fn purge_completed_tasks(
-    db: State<'_, Db>,
-) -> Result<Vec<crate::domain::task::Task>, TaskError> {
+pub async fn purge_completed_tasks(db: State<'_, Db>) -> Result<DeleteOutcome, TaskError> {
     let mut conn = db.lock().map_err(TaskError::Internal)?;
     let settings = repository::get_settings(&conn)?;
     let Some(days) = settings.auto_delete_days else {
-        return Ok(Vec::new());
+        return Ok(DeleteOutcome {
+            deleted: Vec::new(),
+            evicted: Vec::new(),
+        });
     };
-    repository::purge_completed_tasks(&mut conn, days)
+    let sweep = repository::purge_completed_tasks(&mut conn, days, settings.trash_limit)?;
+    Ok(DeleteOutcome {
+        deleted: sweep.moved,
+        evicted: sweep.evicted,
+    })
 }
 
 /// Removes what has been sitting in the trash longer than the configured

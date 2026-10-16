@@ -132,8 +132,11 @@ export function undoNest(receipt: ReparentReceipt): Promise<void> {
 }
 
 /** Soft-deletes completed tasks older than the configured retention period. */
-export function purgeCompletedTasks(): Promise<Task[]> {
-  return invoke<Task[]>('purge_completed_tasks');
+export function purgeCompletedTasks(): Promise<DeleteOutcome> {
+  // Reports what the trash pushed out to stay within its bound: the timer
+  // moves whole trees in, and a bound that only held for single deletions
+  // would not be a bound.
+  return invoke<DeleteOutcome>('purge_completed_tasks');
 }
 
 /** Removes trees that have sat in the trash longer than the configured period. */

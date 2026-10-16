@@ -212,6 +212,29 @@ pub struct TabDeletion {
     pub task_ids: Vec<TaskId>,
 }
 
+/// What one move into the trash did: what arrived, and what it had to push out
+/// to keep the trash within its bound.
+///
+/// Both halves travel together because the second one is a silent loss. Every
+/// path that puts tasks in the trash reports through this type — a deletion by
+/// hand, the completion timer, a deleted tab — so that a trash pushed over its
+/// bound cannot happen without the caller learning which task it cost.
+#[derive(Debug, Clone)]
+pub struct TrashSweep {
+    pub moved: Vec<Task>,
+    pub evicted: Vec<Task>,
+}
+
+impl TrashSweep {
+    /// Nothing moved and nothing left.
+    pub fn empty() -> Self {
+        TrashSweep {
+            moved: Vec::new(),
+            evicted: Vec::new(),
+        }
+    }
+}
+
 /// Palette used to colour tabs automatically.
 pub const TAB_COLORS: [&str; 10] = [
     "#4c6fff", "#0ea5e9", "#10b981", "#84cc16", "#eab308", "#f97316", "#ef4444", "#ec4899",

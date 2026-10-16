@@ -1,4 +1,4 @@
-import type { Tab, TabDeletion, TaskId } from "$lib/types";
+import type { Tab, TabDeletion, Task, TaskId } from "$lib/types";
 import * as tabService from "$services/tabService";
 
 class TabStore {
@@ -133,12 +133,17 @@ class TabStore {
    * The second half of the deletion: now the window has passed, the tab's tasks
    * go to the trash.
    *
+   * Returns what the trash pushed out to stay within its bound, so the caller
+   * can name it: a whole tab arriving at once is the fastest way past the
+   * bound, and a task pushed out silently is a task gone for good.
+   *
    * Safe to call twice — the second call finds no live tasks and returns
    * nothing — which matters because a timer that fires while the app is closing
    * can easily run twice.
    */
-  async finalize(deletion: TabDeletion): Promise<void> {
-    await tabService.finalizeTabDeletion(deletion.tab.id);
+  async finalize(deletion: TabDeletion): Promise<Task[]> {
+    const outcome = await tabService.finalizeTabDeletion(deletion.tab.id);
+    return outcome.evicted;
   }
 
   /** Puts a hidden tab and its tasks back during the undo window. */
