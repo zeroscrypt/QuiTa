@@ -294,14 +294,36 @@ pub fn soft_delete_task(conn: &mut Connection, id: &str) -> Result<Vec<Task>, Ta
 ///
 /// The trash shows exactly what is in there: a subtask that was removed
 /// together with its parent would otherwise be invisible and unreachable.
-pub fn list_deleted_all(conn: &Connection, limit: i64) -> Result<Vec<Task>, TaskError> {
+pub fn list_deleted_all(
+    conn: &Connection,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<Task>, TaskError> {
+    // The offset is what makes the trash a window rather than a wall. Without
+    // it the limit silently cut off everything past the newest rows, and those
+    // tasks could not be restored one by one, because there was no row on
+    // screen to press the button on.
     let mut stmt = conn.prepare(&format!(
-        "SELECT {TASK_COLUMNS} FROM tasks WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC, sort_order ASC LIMIT ?1"
+        "SELECT {TASK_COLUMNS} FROM tasks WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC, sort_order ASC LIMIT ?1 OFFSET ?2"
     ))?;
     let tasks = stmt
-        .query_map([limit], row_to_task)?
+        .query_map(rusqlite::params![limit, offset], row_to_task)?
         .collect::<Result<Vec<_>, _>>()?;
     Ok(tasks)
+}
+
+/// How many tasks are in the trash in total, ignoring any window.
+///
+/// The list itself is capped, and the header still has to state the real
+/// number: a count of 200 sitting above "delete everything" is what made a
+/// user agree to a purge that then removed three times as much.
+pub fn count_deleted(conn: &Connection) -> Result<i64, TaskError> {
+    let total: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM tasks WHERE deleted_at IS NOT NULL",
+        [],
+        |row| row.get(0),
+    )?;
+    Ok(total)
 }
 
 /// Restores a soft-deleted task.

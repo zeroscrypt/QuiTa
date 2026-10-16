@@ -201,6 +201,8 @@ export const en: Record<string, string> = {
   "settings.purgeAllFailed":
     "The bin was not cleared: {count} could not be removed",
   "settings.purging": "Clearing…",
+  "settings.loadMore": "Show more",
+  "settings.loading": "Loading…",
   "settings.purgeAllDone": "Trash cleared — {count} removed",
   "settings.exportFailed": "Export failed: {reason}",
   "settings.dataHint":
@@ -208,6 +210,7 @@ export const en: Record<string, string> = {
   "settings.deleted": "Recently deleted",
   "settings.deletedEmpty": "No deleted tasks",
   "settings.deletedCount": "{count} deleted in total",
+  "settings.deletedShown": "Showing {shown} of {total}",
   "settings.purgeAll": "Clear all",
   "settings.restore": "Restore",
   "settings.deleteForever": "Delete",

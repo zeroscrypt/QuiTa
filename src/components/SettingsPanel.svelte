@@ -539,7 +539,9 @@
           {:else}
             <div class="deleted-header">
               <span class="settings-hint">
-                {t('settings.deletedCount').replace('{count}', String(deleted.length))}
+                {taskStore.hasMoreDeleted
+                  ? t('settings.deletedShown').replace('{shown}', String(deleted.length)).replace('{total}', String(taskStore.deletedTotal))
+                  : t('settings.deletedCount').replace('{count}', String(taskStore.deletedTotal))}
               </span>
               <button
                 class="link danger"
@@ -549,6 +551,17 @@
                 {purging ? t('settings.purging') : t('settings.purgeAll')}
               </button>
             </div>
+            {#if taskStore.hasMoreDeleted}
+              <div class="deleted-more">
+                <button
+                  class="button secondary"
+                  disabled={taskStore.loadingMoreDeleted}
+                  onclick={() => void taskStore.loadMoreDeleted()}
+                >
+                  {taskStore.loadingMoreDeleted ? t('settings.loading') : t('settings.loadMore')}
+                </button>
+              </div>
+            {/if}
             {#each deletedGroups as group (group.key)}
               <div class="deleted-group">
                 <h4 class="deleted-group-title">
@@ -614,7 +627,7 @@
   <div class="backdrop" onclick={() => (purgeAllConfirm = false)} role="presentation">
     <div class="dialog" role="alertdialog" aria-modal="true" tabindex="-1" use:trapFocus>
       <h2 class="dialog-title">{t('delete.title')}</h2>
-      <p class="dialog-message">{t('settings.purgeAllConfirm', { count: String(deleted.length) })}</p>
+      <p class="dialog-message">{t('settings.purgeAllConfirm', { count: String(taskStore.deletedTotal) })}</p>
       <div class="dialog-actions">
         <button class="button secondary" onclick={() => (purgeAllConfirm = false)}>
           {t('delete.cancel')}
