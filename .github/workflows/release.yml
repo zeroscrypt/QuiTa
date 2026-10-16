@@ -26,6 +26,13 @@ name: Release
 # not start a workflow run from actions performed with that token — that
 # restriction exists to stop tokens from recursing. `workflow_dispatch` is the
 # documented exception, so it is used to hand the tag to build.yml.
+  #
+  # The same restriction applies to the merge below, and it has a consequence
+  # worth writing down: the merge is done by this workflow's token, so the push
+  # it makes into main does **not** start the run that would create the tag. The
+  # release therefore finishes on the *next* run — the scheduled one, or a manual
+  # `workflow_dispatch`. That is not a stall to be debugged: it is what GitHub
+  # does with a token that merges a pull request.
 
 on:
   push:
@@ -283,8 +290,23 @@ jobs:
             exit 1
           fi
 
-          latest="$(gh release list --repo "$REPO" --limit 20 --json tagName \
-            --jq '[.[].tagName | select(startswith("v"))] | first // ""')"
+          # The release list lags the manifest by a couple of seconds: the tag and
+          # the release are two API calls, and this job starts at the same moment
+          # as the one that makes them. Reading once meant a red run every single
+          # time a release *did* come out — the check could only ever report
+          # failure, and a check that cannot pass teaches nobody to read it.
+          #
+          # So it waits, and it says it is waiting. The wait is bounded and short:
+          # a genuinely missing release is not going to turn up half a minute
+          # later, and a check that hangs forever is a check nobody trusts.
+          latest=""
+          for _ in $(seq 1 12); do
+            latest="$(gh release list --repo "$REPO" --limit 20 --json tagName \
+              --jq '[.[].tagName | select(startswith("v"))] | first // ""')"
+            [ "${latest#v}" = "$promised" ] && break
+            sleep 5
+          done
+
           echo "manifest promises: $promised"
           echo "newest release:    ${latest:-none}"
 
