@@ -20,6 +20,19 @@ class TaskStore {
   /** Explicitly closed tasks, used while "always expand" is on. */
   collapsed = $state<ReadonlySet<string>>(new Set<string>());
   deleted = $state<Task[]>([]);
+  /**
+   * How many tasks are in the trash in total, which is not the same as how many
+   * are loaded. The two were conflated until now: the header said 200, and so
+   * did the "delete everything" dialog, while the delete itself removed every
+   * row. A user agreeing to remove 200 and losing 300 is not a rounding error.
+   */
+  deletedTotal = $state(0);
+  loadingMoreDeleted = $state(false);
+
+  /** True while the bin holds tasks the list has not been asked for yet. */
+  get hasMoreDeleted(): boolean {
+    return this.deleted.length < this.deletedTotal;
+  }
 
   /**
    * Tab badges count every task of a tab, including rows the current filter
@@ -447,9 +460,35 @@ toggleExpanded(id: TaskId): void {
 
   async loadDeleted(): Promise<void> {
     try {
-      this.deleted = await taskService.listDeletedTasks();
+      const page = await taskService.listDeletedTasks(0);
+      this.deleted = page.tasks;
+      this.deletedTotal = page.total;
     } catch (e) {
       this.showError(e);
+    }
+  }
+
+  /**
+   * Appends the next window of the trash.
+   *
+   * The page size is a rendering bound, not a limit on the data: a task past
+   * the first window still has to be restorable, and the only way to reach it
+   * is to have it on screen.
+   */
+  async loadMoreDeleted(): Promise<void> {
+    if (this.loadingMoreDeleted || !this.hasMoreDeleted) return;
+    this.loadingMoreDeleted = true;
+    try {
+      const page = await taskService.listDeletedTasks(this.deleted.length);
+      // A task restored or purged in another view can shift the window, so the
+      // same row can arrive twice; the list is keyed by id and would throw.
+      const known = new Set(this.deleted.map((task) => task.id));
+      this.deleted = [...this.deleted, ...page.tasks.filter((task) => !known.has(task.id))];
+      this.deletedTotal = page.total;
+    } catch (e) {
+      this.showError(e);
+    } finally {
+      this.loadingMoreDeleted = false;
     }
   }
 

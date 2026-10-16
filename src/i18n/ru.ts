@@ -198,6 +198,8 @@ export const ru: Record<string, string> = {
   "settings.purgeAllFailed":
     "Корзина не очищена: удалить не удалось, осталось {count}",
   "settings.purging": "Очистка…",
+  "settings.loadMore": "Показать ещё",
+  "settings.loading": "Загрузка…",
   "settings.purgeAllDone": "Корзина очищена — удалено {count}",
   "settings.exportFailed": "Не удалось экспортировать: {reason}",
   "settings.dataHint":
@@ -205,6 +207,7 @@ export const ru: Record<string, string> = {
   "settings.deleted": "Недавно удалённые",
   "settings.deletedEmpty": "Удалённых задач нет",
   "settings.deletedCount": "Всего удалённых: {count}",
+  "settings.deletedShown": "Показано {shown} из {total}",
   "settings.purgeAll": "Очистить всё",
   "settings.restore": "Восстановить",
   "settings.deleteForever": "Удалить",
