@@ -229,6 +229,14 @@ export const en: Record<string, string> = {
   "settings.willDeleteOnNextRun": "Deleted on next launch",
   "settings.neverDeleted": "Never deleted automatically",
   "settings.shortcut": "Global shortcut",
+  "shortcuts.window": "show or hide the window, from any app",
+  "shortcuts.switchTab": "switch tab",
+  "shortcuts.newTab": "new tab — opens the name field, like the \"+\" button",
+  "shortcuts.search": "caret into the search field",
+  "shortcuts.settings": "these settings",
+  "shortcuts.create": "create the task in the input field",
+  "shortcuts.closeLayer": "close the topmost open layer, one per press",
+
   "settings.shortcutHint":
     "Show or hide the window from any app. If the shortcut does not work, check keyboard permissions in the OS settings — the window is always available from the tray.",
   "settings.about": "About",

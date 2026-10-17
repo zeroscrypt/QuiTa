@@ -761,6 +761,41 @@ kbd {
   line-height: 1.55;
 }
 
+/* Shortcut table in the settings. One row per combination: keys on the left,
+   what they do on the right. A grid rather than a list of paragraphs so the
+   descriptions line up, which is what makes the block scannable. */
+.shortcut-list {
+  margin: 10px 0 0;
+  display: grid;
+  gap: 6px;
+}
+
+.shortcut-row {
+  display: grid;
+  grid-template-columns: minmax(0, auto) 1fr;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.shortcut-row dt {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.shortcut-row dd {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.shortcut-plus {
+  color: var(--text-tertiary, var(--text-secondary));
+  font-size: 11px;
+}
+
 .segmented {
   display: inline-flex;
   background: var(--bg-secondary);

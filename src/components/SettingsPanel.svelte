@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { uiStore } from '$stores/uiStore.svelte';
   import { settingsStore } from '$stores/settingsStore.svelte';
+  import { shortcutRows as shortcutRowsFor } from '$lib/shortcuts';
   import { buildDeletedHierarchy, retentionVerdict, type DeletedNode } from '$lib/trash';
   import { taskStore } from '$stores/taskStore.svelte';
   import { tabStore } from '$stores/tabStore.svelte';
@@ -42,6 +43,10 @@
   const deleted = $derived(taskStore.deleted);
   const trashRetentionDays = $derived(settingsStore.trashRetentionDays);
   const shortcutLabel = $derived(appStore.info?.shortcut ?? '');
+  // Every shortcut the app answers to, spelled for the keyboard in front of the
+  // user. The list lives here rather than in the About dialog because this is
+  // where people go looking for "what was that key again".
+  const shortcutRows = $derived(shortcutRowsFor(appStore.info?.platform, shortcutLabel));
 
   /**
    * Days left before the tree is removed by the retention policy. The clock
@@ -354,12 +359,26 @@
             <InfoHint text={t('settings.hintShortcut')} />
           </h3>
           <p class="settings-hint">
-            <!-- The combination comes from the backend, which is where it is
-                 actually registered. Writing "Cmd+Shift+Q" into the markup
-                 showed macOS keys on a Windows keyboard, where no such
-                 combination exists. -->
+            <!-- The global combination comes from the backend, which is where
+                 it is actually registered. Writing "Cmd+Shift+Q" into the
+                 markup showed macOS keys on a Windows keyboard, where no such
+                 combination exists. The window keys need the platform for the
+                 same reason: ⌘T and Ctrl+T are different keys. -->
             <kbd>{shortcutLabel}</kbd> — {t('settings.shortcutHint')}
           </p>
+          <dl class="shortcut-list">
+            {#each shortcutRows as row (row.labelKey)}
+              <div class="shortcut-row">
+                <dt>
+                  {#each row.keys as key, index (key)}
+                    {#if index > 0}<span class="shortcut-plus" aria-hidden="true">+</span>{/if}
+                    <kbd>{key}</kbd>
+                  {/each}
+                </dt>
+                <dd>{t(row.labelKey)}</dd>
+              </div>
+            {/each}
+          </dl>
         </section>
       {/if}
 

@@ -206,7 +206,8 @@ immediately.
 | `Cmd+1`…`Cmd+9` / `Ctrl+1`…`Ctrl+9` | switching tabs (above) |
 
 All three take the same modifier as the digits, and hand the keyboard to an
-open dialog exactly as those do. `Cmd+T` does not create a nameless tab behind
+open dialog exactly as those do. The full list lives in the settings, under
+"Global shortcut", written for the keyboard in front of you. `Cmd+T` does not create a nameless tab behind
 your back: it opens the same field the button opens, name included — the name is
 what the tab is for.
 
@@ -314,7 +315,7 @@ therefore testable without a window.
 | `pnpm tauri dev` | Run with hot reload |
 | `pnpm tauri build` | Installers for the current platform |
 | `pnpm check` | Svelte and TypeScript types |
-| `pnpm test` | 164 unit tests |
+| `pnpm test` | 170 unit tests |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | 156 Rust tests (40 unit + 112 integration against a real database + 4 guarding the docs) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Lints, errors as warnings |
 | `cargo audit` | Vulnerabilities in dependencies |
