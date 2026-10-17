@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/zeroscrypt/QuiTa/compare/v1.4.1...v1.5.0) (2026-10-17)
+
+
+### Новое
+
+* **настройки:** полный список горячих клавиш в секции «Горячая клавиша» ([#36](https://github.com/zeroscrypt/QuiTa/issues/36)) ([33a0281](https://github.com/zeroscrypt/QuiTa/commit/33a02818b811531126ae8703f98c5fb452a8b1d5))
+
 ## [1.4.1](https://github.com/zeroscrypt/QuiTa/compare/v1.4.0...v1.4.1) (2026-10-16)
 
 
