@@ -10,6 +10,12 @@ export interface AppInfo {
   repository: string;
   /** Global shortcut as registered on this platform. */
   shortcut: string;
+  /**
+   * Operating system this process runs on: "macos" | "windows" | "linux".
+   * Taken from the backend because the settings list every shortcut, and a Mac
+   * keyboard and a PC one spell the same combination differently.
+   */
+  platform: string;
   /** Field lengths the database accepts, in characters. */
   limits: Limits;
 }

@@ -226,6 +226,14 @@ export const ru: Record<string, string> = {
   "settings.willDeleteOnNextRun": "Удаляется при следующем запуске",
   "settings.neverDeleted": "Не удаляется автоматически",
   "settings.shortcut": "Горячая клавиша",
+  "shortcuts.window": "показать или скрыть окно, из любого приложения",
+  "shortcuts.switchTab": "переключить вкладку",
+  "shortcuts.newTab": "новая вкладка — открывает поле имени, как кнопка «+»",
+  "shortcuts.search": "курсор в поле поиска",
+  "shortcuts.settings": "эти настройки",
+  "shortcuts.create": "создать задачу из поля ввода",
+  "shortcuts.closeLayer": "закрыть верхний открытый слой — по одному на нажатие",
+
   "settings.shortcutHint":
     "Показать или скрыть окно из любого приложения. Если сочетание не работает, проверьте разрешения на доступ к клавиатуре в настройках ОС — окно всегда доступно через значок в трее.",
   "settings.about": "О программе",

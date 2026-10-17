@@ -15,7 +15,7 @@
 | Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 40 |
 | Rust integration | то же | 112 |
 | Rust документация | то же (`tests/documentation.rs`) | 4 |
-| TypeScript | `pnpm test` | 164 |
+| TypeScript | `pnpm test` | 170 |
 
 Числа берутся из фактического прогона. Если они разошлись с таблицей —
 значит, тесты забыли пересчитать, и это такое же расхождение кода и
@@ -305,6 +305,17 @@ SSR-рендер компонента задачи — проверяет кон
 | `sends nothing to the trash when the user undoes inside the window` | Откат внутри окна отменяет вторую половину удаления |
 | `starting up > finishes a tab deletion the app closed in the middle of` | Подметание при старте |
 
+### `tests/shortcuts.test.ts`
+
+| Тест | Что проверяет |
+|------|---------------|
+| `spells the command key the way the keyboard in front of the user does` | ⌘ на macOS, Ctrl на остальных |
+| `falls back to Ctrl when the platform is not known yet` | До первого ответа бэкенда список не врёт про клавиатуру |
+| `lists every shortcut the app answers to` | Семь сочетаний, ни одного пропущенного |
+| `puts the global shortcut first, spelled by the backend` | Глобальное сочетание приходит из Rust, а не из разметки |
+| `uses the platform modifier for the window keys and none for the rest` | Модификатор у нужных строк и его отсутствие у `Enter`/`Esc` |
+| `drops the global row when the backend has not answered yet` | Пустая строка не превращается в одинокий «+» |
+
 ### `tests/trash.test.ts`
 
 | Тест | Что проверяет |
@@ -433,7 +444,7 @@ GitHub Actions (`.github/workflows/ci.yml`):
 
 | Проверка | Команда | Результат |
 |----------|---------|-----------|
-| Тесты UI | `pnpm test` | 164 из 164 пройдено (22 файла) |
+| Тесты UI | `pnpm test` | 170 из 170 пройдено (23 файла) |
 | Тесты Rust | `cargo test` | 40 unit + 112 интеграционных + 4 на документацию |
 
 Более ранний прогон, на котором сняты остальные строки таблицы:

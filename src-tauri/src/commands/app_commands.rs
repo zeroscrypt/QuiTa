@@ -69,6 +69,13 @@ pub struct AppInfo {
     /// "Win+Alt+Q". Read from the same place that registers it, so the settings
     /// cannot claim a combination the app does not actually use.
     pub shortcut: &'static str,
+    /// Operating system this process runs on: "macos" | "windows" | "linux".
+    ///
+    /// The window shortcuts are spelled differently on a Mac keyboard and on a
+    /// PC one, and the settings list every shortcut. Guessing the platform in
+    /// the interface would mean a second place to keep wrong, next to the one
+    /// the backend already gets right for the global shortcut.
+    pub platform: &'static str,
     /// Input limits enforced by the repository. The UI takes them from here
     /// rather than repeating the numbers: two hand-kept copies drift apart, and
     /// the input then stops accepting what the database would have stored.
@@ -95,6 +102,7 @@ pub fn get_app_info() -> AppInfo {
         license: "MIT",
         repository: "https://github.com/zeroscrypt/QuiTa",
         shortcut: crate::platform::shortcuts::shortcut_label(std::env::consts::OS),
+        platform: std::env::consts::OS,
         limits: Limits {
             title: crate::domain::validation::MAX_TITLE_CHARS,
             tab_name: crate::domain::validation::MAX_TAB_NAME_CHARS,
