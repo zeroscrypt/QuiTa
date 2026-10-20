@@ -13,6 +13,11 @@
           "jsonpath": "$.package.version"
         },
         {
+          "type": "toml",
+          "path": "src-tauri/Cargo.lock",
+          "jsonpath": "$.package[?(@.name.value=='quita')].version"
+        },
+        {
           "type": "json",
           "path": "src-tauri/tauri.conf.json",
           "jsonpath": "$.version"
