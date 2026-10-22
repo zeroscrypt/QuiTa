@@ -346,6 +346,13 @@
       {task.dueDate ?? t('due.placeholder')}
     </button>
 
+    {#if notRelevant}
+      <!-- The state spelled out, in the same small font as the date chip: the
+           cross says "closed", the word says "не актуальная" — a status that
+           should be readable without decoding icons. -->
+      <span class="mark-badge">{t('task.markNotRelevant')}</span>
+    {/if}
+
     {#if progress}
       <span class="progress-badge" title={t('task.progress')}>{progress}</span>
     {/if}
