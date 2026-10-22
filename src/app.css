@@ -148,20 +148,19 @@ input {
   opacity: 1;
 }
 
-/* Не актуальная: red cross. On an open box the cross is red itself; on a
-   closed-and-marked task the box fills red and the cross goes white, so a
-   task closed in both senses reads as closed once, red. */
-.checkbox.not-relevant svg {
-  opacity: 1;
-}
-
+/* Не актуальная: the box is always filled red with a white cross — the same
+   visual weight as the check mark on a completed task, only red. A faint
+   glyph on an open box read as "мелкий тусклый шрифт", so the mark takes the
+   strong form regardless of whether the task is also completed. The rule sits
+   after `[aria-checked='true']` so red wins over the accent fill when a task
+   is closed both ways. */
 .checkbox.not-relevant {
-  border-color: var(--danger);
-}
-
-.checkbox[aria-checked='true'].not-relevant {
   background: var(--danger);
   border-color: var(--danger);
+}
+
+.checkbox.not-relevant svg {
+  opacity: 1;
 }
 
 /* Scrollbar */

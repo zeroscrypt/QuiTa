@@ -226,7 +226,7 @@ SSR-рендер компонента задачи — проверяет кон
 | `renders an open task as unchecked` | `aria-checked="false"`, нет класса `completed` |
 | `renders a completed task as checked` | Завершённая задача отмечена |
 | `marks an overdue task and shows its calendar date` | Подсветка просрочки и дата в формате YYYY-MM-DD |
-| `renders a marked task red and dim, and does not call it checked` | «Не актуальная»: красная строка с крестиком, без галочки и зачёркивания |
+| `renders a marked task red and dim, and does not call it checked` | «Не актуальная»: красная строка, белый крест на красной заливке, без галочки и зачёркивания |
 | `keeps the red cross on a task closed in both senses` | Завершённая и помеченная задача выглядит красной, а не серой |
 | `offers subtask creation for roots and counts the parent in progress` | Прогресс и кнопка подзадачи у корневой задачи |
 | `marks a completed task with open subtasks as partially done` | Состояние «частично выполнено» |

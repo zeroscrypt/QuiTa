@@ -27,8 +27,6 @@
     label: string;
     onToggle: () => void;
   } = $props();
-
-  const markedNotDone = $derived(notRelevant && !checked);
 </script>
 
 <button
@@ -46,13 +44,14 @@
 >
   <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
     {#if notRelevant}
-      <!-- Не актуальная: a cross, red on an open box or white on a red
-           fill when the task is closed both ways. -->
+      <!-- Не актуальная: a white cross on a red fill — same contrast as the
+           check mark on a completed task, only red. The mark must stay
+           readable while the text of the row is dimmed. -->
       <path
         d="M2.5 2.5l7 7M9.5 2.5l-7 7"
         fill="none"
-        stroke={markedNotDone ? 'var(--danger)' : '#fff'}
-        stroke-width="1.9"
+        stroke="#fff"
+        stroke-width="2.2"
         stroke-linecap="round"
       />
     {:else if partial}
