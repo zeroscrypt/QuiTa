@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/zeroscrypt/QuiTa/compare/v1.8.0...v1.9.0) (2026-10-22)
+
+
+### Новое
+
+* **база:** резервные копии с ротацией, по настройке ([#52](https://github.com/zeroscrypt/QuiTa/issues/52)) ([fde950a](https://github.com/zeroscrypt/QuiTa/commit/fde950a9be6feaa8f2f9f31492c5df935360d3ca))
+
 ## [1.8.0](https://github.com/zeroscrypt/QuiTa/compare/v1.7.1...v1.8.0) (2026-10-22)
 
 
