@@ -143,6 +143,7 @@ Windows, `.AppImage` + `.deb` on Linux.
 - [x] **Hotkey** — `⌘⇧Q` on macOS, `Win+Alt+Q` on Windows, `Ctrl+Alt+Q` on Linux — opens the window with the caret in the input.
 - [x] **Export and import** — a snapshot of the whole app as JSON.
 - [x] **In-app updates** — a green strip above the tabs: "Version 1.1.4 is available".
+- [x] **Backups** — a copy of the SQLite file at launch (once a day) and on demand; the rotation keeps the configured number of generations.
 - [x] **Resizable window** — double-click the logo to fill the height of the screen's work area and widen by 1.6×. The taskbar and the menu bar never cover the window, and it always stays fully on screen.
 - [x] **Overdue highlighting** — a separate colour, not just a date.
 - [x] **Keyboard first** — `Enter` saves, `Esc` cancels, the caret never jumps.
@@ -317,8 +318,8 @@ therefore testable without a window.
 | `pnpm tauri dev` | Run with hot reload |
 | `pnpm tauri build` | Installers for the current platform |
 | `pnpm check` | Svelte and TypeScript types |
-| `pnpm test` | 181 unit tests |
-| `cargo test --manifest-path src-tauri/Cargo.toml` | 167 Rust tests (47 unit + 116 integration against a real database + 4 guarding the docs) |
+| `pnpm test` | 183 unit tests |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | 171 Rust tests (49 unit + 118 integration against a real database + 4 guarding the docs) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Lints, errors as warnings |
 | `cargo audit` | Vulnerabilities in dependencies |
 

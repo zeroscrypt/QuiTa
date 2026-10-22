@@ -96,6 +96,8 @@ pub fn run() {
             commands::task_commands::search_tasks,
             commands::settings_commands::get_settings,
             commands::settings_commands::update_settings,
+            commands::backup_commands::backup_database,
+            commands::backup_commands::backup_info,
             commands::export_commands::export_tasks,
             commands::export_commands::import_tasks,
             commands::window_commands::toggle_window_height,

@@ -112,6 +112,13 @@ export interface AppSettings {
    * no click (default: false — updates stay behind the banner).
    */
   autoUpdate: boolean;
+  /**
+   * A copy of the database is taken at launch when the newest stored one is
+   * older than a day (default: false — backups wait for an explicit opt-in).
+   */
+  backupEnabled: boolean;
+  /** How many copies the rotation keeps before the oldest is deleted. */
+  backupCopies: number;
 }
 
 export interface ToggleOutcome {

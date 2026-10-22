@@ -149,6 +149,18 @@ export const en: Record<string, string> = {
     "Compacting returns {size} to the system. SQLite reuses free pages on its own, so this is not needed in normal use.",
   "db.vacuumSaved": "Reclaimed {size}.",
   "db.vacuumNothing": "Compacting finished, there was nothing to reclaim.",
+  "db.backups": "Backups",
+  "db.backupHint":
+    "A backup is a separate SQLite file next to the database: if anything happens to the database, the copy opens in any program that understands SQLite.",
+  "db.backupAuto": "Copy at launch",
+  "db.backupAutoHint":
+    "Once a day: when the newest copy is younger than 24 hours, the launch passes quietly, without copying.",
+  "db.backupCopies": "Copies to keep",
+  "db.backupNow": "Back up now",
+  "db.backupRunning": "Copying…",
+  "db.backupDone": "Backup saved.",
+  "db.backupLast": "Last copy: {time}, {count} in total.",
+  "db.backupNone": "No copies yet.",
   "db.howItWorks": "How it works",
   "db.storageNote":
     "The database is a plain SQLite file. Nothing is encrypted and nothing leaves this machine: copy the file to make a backup.",

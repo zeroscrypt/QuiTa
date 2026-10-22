@@ -12,10 +12,10 @@
 
 | Набор | Команда | Тестов |
 |-------|---------|--------|
-| Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 47 |
-| Rust integration | то же | 116 |
+| Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 49 |
+| Rust integration | то же | 118 |
 | Rust документация | то же (`tests/documentation.rs`) | 4 |
-| TypeScript | `pnpm test` | 181 |
+| TypeScript | `pnpm test` | 183 |
 
 Числа берутся из фактического прогона. Если они разошлись с таблицей —
 значит, тесты забыли пересчитать, и это такое же расхождение кода и
@@ -56,6 +56,13 @@
 | `marking_a_subtask_plans_nothing_beyond_that_one_task` | Пометка подзадачи — только строка самой подзадачи, без события |
 | `the_completion_plan_ignores_the_not_relevant_mark` | Два закрытия — два независимых факта: домен завершения не читает пометку |
 | `cascade_disabled_mean_reopening_restores_nothing` | Без каскада открытие родителя не восстанавливает подзадачи |
+
+### `src-tauri/src/db/backup.rs`
+
+| Тест | Что проверяет |
+|------|---------------|
+| `stamps_come_from_and_go_back_to_rfc3339` | Штамп из RFC-3339: миллисекунды отрезаются, обрезанный или неформатный ввод не становится именем |
+| `stamps_are_read_only_from_names_that_look_like_copies` | В листинг попадают только файлы вида `quita-backup-{штамп}.db` |
 
 ## Интеграционные тесты Rust
 
@@ -161,6 +168,20 @@
 | `validation_helpers_match_their_specs` | Соответствие валидации спецификации |
 | `toggle_plan_children_are_filtered_correctly` | Фильтрация детей в плане завершения |
 
+### Настройки
+
+| Тест | Что проверяет |
+|------|---------------|
+| `cascade_setting_round_trips_through_settings` | Каскад из настроек: значения читаются и записываются |
+| `auto_update_round_trips_and_defaults_off` | Отсутствующий ключ остаётся тишиной: найденное обновление держится за баннером |
+| `backup_settings_round_trip_and_defaults` | По умолчанию тихо и три копии; 99 сжимается до 30, 0 до 1 |
+
+### Резервные копии
+
+| Тест | Что проверяет |
+|------|---------------|
+| `backup_creates_rotating_copies` | Три копии при `keep=2` оставляют две последние, старейшая удаляется, свежейшая копия открывается как база и несёт данные |
+
 ### Документация (`src-tauri/tests/documentation.rs`)
 
 | Тест | Что проверяет |
@@ -171,7 +192,7 @@
 
 ## Тесты TypeScript (vitest)
 
-Двадцать пять файлов, 181 тестов. Ниже перечислены все наборы.
+Двадцать шесть файлов, 183 теста. Ниже перечислены все наборы.
 
 ### `tests/taskValidation.test.ts`
 
@@ -371,6 +392,13 @@ SSR-рендер компонента задачи — проверяет кон
 | `has no stale English-only keys` | Нет ключей только в одном языке |
 | `keeps the same placeholders in both languages` | Плейсхолдеры совпадают в обоих словарях |
 | `falls back to the key when a translation is missing` | Отсутствующий перевод не ломает UI |
+
+### `tests/dbBackup.test.ts`
+
+| Тест | Что проверяет |
+|------|---------------|
+| `backs up on demand and refreshes the listing with the rotation in it` | Кнопка «сейчас» проходит команду и приносит листинг уже после ротации |
+| `reports a failed copy without claiming success` | Провал копии виден в ошибке таба, а не в тишине успеха |
 
 ### `tests/updateStore.test.ts`
 

@@ -1,6 +1,7 @@
 //! Integration tests against a real (temporary) SQLite database, exercising
 //! the same repository functions the Tauri commands use.
 
+use quita_lib::db::backup;
 use quita_lib::db::migrations;
 use quita_lib::db::repository;
 use quita_lib::domain::rules::compute_toggle_plan;
@@ -1056,6 +1057,78 @@ fn auto_update_round_trips_and_defaults_off() {
     .unwrap();
     assert!(updated.auto_update);
     assert!(repository::get_settings(&conn).unwrap().auto_update);
+}
+
+#[test]
+fn backup_settings_round_trip_and_defaults() {
+    let mut conn = open_test_db();
+    // Defaults: quiet and three generations. Nothing must start writing
+    // files because a checkbox or a number was missing from the storage.
+    let saved = repository::get_settings(&conn).unwrap();
+    assert!(!saved.backup_enabled);
+    assert_eq!(saved.backup_copies, repository::DEFAULT_BACKUP_COPIES);
+
+    let settings = repository::get_settings(&conn).unwrap();
+    let updated = repository::update_settings(
+        &mut conn,
+        &AppSettings {
+            backup_enabled: true,
+            // Far past the ceiling: the storage keeps the bound, the UI may
+            // hand over any number.
+            backup_copies: 99,
+            ..settings
+        },
+    )
+    .unwrap();
+    assert!(updated.backup_enabled);
+    assert_eq!(updated.backup_copies, repository::MAX_BACKUP_COPIES);
+
+    let settings = repository::get_settings(&conn).unwrap();
+    let updated = repository::update_settings(
+        &mut conn,
+        &AppSettings {
+            // Below the floor. Zero copies would mean "keep nothing", which
+            // is not a backup policy.
+            backup_copies: 0,
+            ..settings
+        },
+    )
+    .unwrap();
+    assert_eq!(updated.backup_copies, repository::MIN_BACKUP_COPIES);
+}
+
+#[test]
+fn backup_creates_rotating_copies() {
+    let mut conn = open_test_db();
+    repository::create_task(&mut conn, "Данные для копии", None, None, true).unwrap();
+
+    let dir = std::env::temp_dir().join(format!("quita-backup-test-{}", uuid::Uuid::new_v4()));
+    let keep = 2;
+
+    backup::create_backup(&conn, &dir, keep, "2026-01-01T10:00:00Z").unwrap();
+    backup::create_backup(&conn, &dir, keep, "2026-01-02T10:00:00Z").unwrap();
+    let info = backup::create_backup(&conn, &dir, keep, "2026-01-03T10:00:00Z").unwrap();
+
+    // Rotation keeps the newest two of the three taken; the listing reads
+    // newest first, straight from the stamps in the names.
+    assert_eq!(info.files.len(), keep as usize);
+    assert!(info.files[0].name.contains("20260103-100000"));
+    assert!(info.files[1].name.contains("20260102-100000"));
+    assert!(info.files.iter().all(|f| !f.name.contains("20260101")));
+
+    // A copy must be a database, not just bytes: it opens on its own and
+    // carries the data that was in the base when it was taken.
+    let copy = Connection::open(dir.join(&info.files[0].name)).unwrap();
+    let count: i64 = copy
+        .query_row(
+            "SELECT COUNT(*) FROM tasks WHERE deleted_at IS NULL",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(count, 1);
+
+    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]
@@ -2756,6 +2829,8 @@ fn export_carries_the_whole_state_and_import_reproduces_it() {
         trash_retention_days: None,
         language: "en".to_string(),
         auto_update: false,
+        backup_enabled: false,
+        backup_copies: repository::DEFAULT_BACKUP_COPIES,
     };
     repository::update_settings(&mut conn, &settings).unwrap();
     let _ = done;
@@ -2809,6 +2884,8 @@ fn importing_a_state_file_restores_tabs_hierarchy_and_settings() {
             trash_retention_days: None,
             language: "en".to_string(),
             auto_update: false,
+            backup_enabled: false,
+            backup_copies: repository::DEFAULT_BACKUP_COPIES,
         },
     )
     .unwrap();
