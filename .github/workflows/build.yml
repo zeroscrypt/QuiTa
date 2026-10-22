@@ -130,6 +130,10 @@ jobs:
       # that the in-app update banner reads. A release built without the
       # signing secret is still installable; it just has no latest.json, so the
       # app will not offer an update. Check for that file in the release.
+      # The manifest this step writes is an intermediate: four jobs racing for
+      # one file means the last upload wins and its manifest knows only its own
+      # platforms. The manifest job below rebuilds one authoritative manifest
+      # from the signatures this step leaves behind.
       - name: Build and publish
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
@@ -143,6 +147,36 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }} --config src-tauri/tauri.updater.conf.json
+
+  # One authoritative latest.json, assembled from the signatures already on
+  # the release. This must be a separate job: inside a single build, all four
+  # platform jobs write latest.json at the same time, and whoever uploads last
+  # wins with a manifest that knows only its own platforms — on release 1.5.0
+  # the Intel macOS job won, so Apple Silicon, Windows and Linux updaters
+  # found no row for themselves and silently offered no update. Rebuilding
+  # from the .sig files after every job has finished cannot lose that race,
+  # and a signature missing for any platform fails here loudly.
+  manifest:
+    name: Updater manifest
+    needs: build
+    runs-on: ubuntu-latest
+    # A stuck job must not hold a runner for the six hours GitHub allows.
+    timeout-minutes: 10
+    steps:
+      # `node` is preinstalled on the runner; the script comes from the commit
+      # being built, so a checkout is required even though it touches no
+      # source file.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Rebuild latest.json from the release signatures
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          node scripts/merge-updater-json.mjs \
+            --tag "$TAG" --repo "${{ github.repository }}" --upload
 
   checksums:
     name: Checksums
