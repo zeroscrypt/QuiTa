@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/zeroscrypt/QuiTa/compare/v1.7.1...v1.8.0) (2026-10-22)
+
+
+### Новое
+
+* **обновления:** повторная проверка раз в 24 часа, пока окно открыто ([#50](https://github.com/zeroscrypt/QuiTa/issues/50)) ([a89d00e](https://github.com/zeroscrypt/QuiTa/commit/a89d00e35f1ec39e6658a014d5462040a3ba4b5a))
+
 ## [1.7.1](https://github.com/zeroscrypt/QuiTa/compare/v1.7.0...v1.7.1) (2026-10-22)
 
 
