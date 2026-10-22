@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1](https://github.com/zeroscrypt/QuiTa/compare/v1.6.0...v1.6.1) (2026-10-22)
+
+
+### Исправлено
+
+* **интерфейс:** отметка «не актуальная» белым крестом на красной заливке ([#44](https://github.com/zeroscrypt/QuiTa/issues/44)) ([a4f1c64](https://github.com/zeroscrypt/QuiTa/commit/a4f1c646a343f9ad3b84e37f9e9dbfe7443d12be))
+
 ## [1.6.0](https://github.com/zeroscrypt/QuiTa/compare/v1.5.1...v1.6.0) (2026-10-22)
 
 
