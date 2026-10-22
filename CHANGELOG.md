@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/zeroscrypt/QuiTa/compare/v1.5.1...v1.6.0) (2026-10-22)
+
+
+### Новое
+
+* **задачи:** статус «Не актуальная» ([#42](https://github.com/zeroscrypt/QuiTa/issues/42)) ([66583f1](https://github.com/zeroscrypt/QuiTa/commit/66583f1908b2c0bb8dce3d524639f7d17aa07d9f))
+
 ## [1.5.1](https://github.com/zeroscrypt/QuiTa/compare/v1.5.0...v1.5.1) (2026-10-22)
 
 
