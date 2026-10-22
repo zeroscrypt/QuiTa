@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/zeroscrypt/QuiTa/compare/v1.6.1...v1.7.0) (2026-10-22)
+
+
+### Новое
+
+* **настройки:** вкладка «О программе» и галочка автообновления ([#46](https://github.com/zeroscrypt/QuiTa/issues/46)) ([755101b](https://github.com/zeroscrypt/QuiTa/commit/755101b859e165fcd861328800a318ade95d8b66))
+
 ## [1.6.1](https://github.com/zeroscrypt/QuiTa/compare/v1.6.0...v1.6.1) (2026-10-22)
 
 
