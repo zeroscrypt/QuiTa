@@ -31,7 +31,7 @@ export function toggleTaskCompletion(
 }
 
 /**
- * Flips the "не актуальная" mark. The backend mirrors the completion cascade
+ * Flips the "не актуально" mark. The backend mirrors the completion cascade
  * on its own, so the UI only needs the id — no per-call settings.
  */
 export function toggleTaskNotRelevance(id: TaskId): Promise<ToggleOutcome> {

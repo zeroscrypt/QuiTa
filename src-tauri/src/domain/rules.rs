@@ -79,7 +79,7 @@ pub fn compute_toggle_plan(target: &Task, children: &[Task], cascade: bool) -> T
     }
 }
 
-/// The mirror image of `TogglePlan` for the "не актуальная" mark. Mirroring
+/// The mirror image of `TogglePlan` for the "не актуально" mark. Mirroring
 /// is deliberate: the user described the mark as "статус как у закрытой", so
 /// the mechanics — cascade under a recorded event, precise undo on unmark —
 /// are the completion mechanics under different column names.
@@ -94,7 +94,7 @@ pub struct MarkPlan {
     pub children_to_unmark: Vec<String>,
 }
 
-/// Computes the mark plan. Rules (docs/TASK_RULES.md, "Не актуальная"):
+/// Computes the mark plan. Rules (docs/TASK_RULES.md, "Не актуально"):
 ///
 /// - Marking a parent auto-marks every subtask that is not marked already;
 ///   completion state is untouched — a hand-completed subtask keeps both
@@ -280,7 +280,7 @@ mod tests {
         );
     }
 
-    // --- "Не актуальная" -------------------------------------------------
+    // --- "Не актуально" -------------------------------------------------
 
     fn marked(
         id: &str,

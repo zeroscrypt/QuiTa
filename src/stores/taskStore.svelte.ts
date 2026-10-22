@@ -33,7 +33,7 @@ class TaskStore {
   collapsed = $state<ReadonlySet<string>>(new Set<string>());
   /**
    * The task the keyboard works on: the last row the user pressed, any
-   * pointer button. ⌘D/Ctrl+D marks it "не актуальная" without another click,
+   * pointer button. ⌘D/Ctrl+D marks it "не актуально" without another click,
    * so the mark has to stay a one-gesture promise — hence the state lives
    * here, not inside a component where it would die with the row.
    */
@@ -309,7 +309,7 @@ class TaskStore {
   }
 
   /**
-   * Flips the "не актуальная" mark, mirroring `toggle` in every way but the
+   * Flips the "не актуально" mark, mirroring `toggle` in every way but the
    * backend call: same in-place update, same handling of rows that re-enter
    * the list, same badge refresh. The mark cascades inside the backend, so
    * the outcome — not the request — carries what changed.

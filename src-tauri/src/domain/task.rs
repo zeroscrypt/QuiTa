@@ -31,14 +31,14 @@ pub struct Task {
     /// For subtasks only: completion event id of the parent that
     /// auto-completed this subtask. NULL means the user completed it manually.
     pub auto_completed_by: Option<String>,
-    /// The task is deliberately kept but will not be done: "не актуальная".
+    /// The task is deliberately kept but will not be done: "не актуально".
     /// Red, dimmed, a cross in the checkbox — and treated as closed everywhere
     /// a completed task is, because the user pointed at the closed state as
     /// the model to follow.
     #[serde(default)]
     pub not_relevant_at: Option<String>,
     /// Set on a root task when its children were auto-marked by a parent
-    /// "не актуальная" event, so unmarking can undo exactly its own marks.
+    /// "не актуально" event, so unmarking can undo exactly its own marks.
     #[serde(default)]
     pub not_relevant_event_id: Option<String>,
     /// For subtasks only: the parent mark event that auto-marked this

@@ -295,7 +295,7 @@ fn apply_toggle_plan(tx: &Connection, plan: &TogglePlan) -> Result<(), TaskError
     Ok(())
 }
 
-/// Toggles the "не актуальная" mark on a task, mirroring the completion
+/// Toggles the "не актуально" mark on a task, mirroring the completion
 /// cascade. Marking a parent auto-marks its not-yet-marked subtasks under a
 /// fresh event id recorded on the parent; unmarking undoes exactly the marks
 /// that event made, leaving hand-marked subtasks alone. See
@@ -512,7 +512,7 @@ pub fn list_roots(
     tab_id: Option<&str>,
 ) -> Result<Vec<Task>, TaskError> {
     // `tab_id = None` means "every tab"; a specific id filters to that tab.
-    // "Closed" is either completion or the "не актуальная" mark, so both
+    // "Closed" is either completion or the "не актуально" mark, so both
     // timestamps gate the hidden branch; the showing branch filters nothing,
     // exactly like completed tasks.
     let sql = if include_completed {

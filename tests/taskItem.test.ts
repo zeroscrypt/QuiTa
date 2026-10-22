@@ -50,7 +50,7 @@ describe('TaskItem rendering', () => {
   });
 
   it('renders a marked task red and dim, and does not call it checked', () => {
-    // "Не актуальная" is not completion: no check, no strikethrough. The mark
+    // "Не актуально" is not completion: no check, no strikethrough. The mark
     // carries the same weight as the check mark — a white cross on a red
     // fill — so it stays readable while the text of the row is dimmed. The
     // chip spells the state out in the same small font as the date badge.
@@ -61,8 +61,8 @@ describe('TaskItem rendering', () => {
     expect(body).toContain('M2.5 2.5l7 7'); // the cross path
     expect(body).toContain('stroke="#fff"'); // white on red, not a faint glyph
     expect(body).toContain('stroke-width="2.2"'); // bolder than the old 1.9
-    expect(body).toContain('mark-badge'); // the "не актуальная" caption
-    expect(body).toContain('Не актуальная');
+    expect(body).toContain('mark-badge'); // the "не актуально" caption
+    expect(body).toContain('Не актуально');
   });
 
   it('keeps the red cross on a task closed in both senses', () => {

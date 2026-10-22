@@ -107,7 +107,7 @@ describe('canHaveSubtasks', () => {
   });
 });
 
-describe('не актуальная', () => {
+describe('не актуально', () => {
   const marked = '2026-01-02T00:00:00Z';
 
   it('reads the mark and the two closures as one closed state', () => {
@@ -144,7 +144,7 @@ describe('не актуальная', () => {
   });
 
   it('a mark retires the work, so the parent is not "partially done"', () => {
-    // "Не актуальная" is a different gesture with the same consequence: below
+    // "Не актуально" is a different gesture with the same consequence: below
     // a converted parent there is no open work left to report.
     const parent = makeTask({ completedAt: marked, notRelevantAt: marked });
     const open = makeTask({ id: 'c1', parentId: 'id' });

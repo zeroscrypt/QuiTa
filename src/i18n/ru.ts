@@ -36,7 +36,7 @@ export const ru: Record<string, string> = {
   "tab.dragHint": "Перетащите, чтобы изменить порядок вкладок",
   "task.autoDelete": "Удалять завершённые через N дней",
   "task.autoDeleteOn": "Автоудаление: {days} дн.",
-  "task.markNotRelevant": "Не актуальная",
+  "task.markNotRelevant": "Не актуально",
   "task.markRelevant": "Снова актуальная",
 
   "due.label": "Срок задачи",
@@ -261,7 +261,7 @@ export const ru: Record<string, string> = {
   "shortcuts.search": "курсор в поле поиска",
   "shortcuts.settings": "эти настройки",
   "shortcuts.markNotRelevant":
-    "пометить последнюю нажатую задачу «не актуальной» и наоборот: красная приглушённая строка с крестиком, статус как у закрытой",
+    "пометить последнюю нажатую задачу «не актуально» и наоборот: красная приглушённая строка с крестиком, статус как у закрытой",
   "shortcuts.create": "создать задачу из поля ввода",
   "shortcuts.closeLayer": "закрыть верхний открытый слой — по одному на нажатие",
 
