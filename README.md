@@ -131,7 +131,7 @@ Windows, `.AppImage` + `.deb` on Linux.
 - [x] **Tabs as projects** — create, rename by double click, reorder by drag, automatic colour from a 10-colour palette. Deleting a tab asks first and one click undoes it: the tab goes first, and its tasks wait out ten seconds before following it into the trash.
 - [x] **Subtasks** — exactly one level deep, and that is the limit.
 - [x] **Not relevant** — retire a task without deleting it: a red, dimmed row with a cross, closed status in every list. A menu item plus `Cmd+D`/`Ctrl+D` on the last-pressed task.
-- [x] **Due dates** — calendar dates with no timezone shift, overdue tasks highlighted, chips for today / tomorrow.
+- [x] **Due dates** — calendar dates with no timezone shift, overdue tasks highlighted, chips for today / tomorrow. A deadline can be typed as words inside the title: «проверить диски за неделю» or «позвонить в пт» — the date moves into the task's property, the words stay a task.
 - [x] **Comments** — autosaved, opened from the button next to a task.
 - [x] **Storm entry** — the field never closes after `Enter`, the caret stays put.
 - [x] **Drag & drop** — three zones, no timers and no dwell.
@@ -318,7 +318,7 @@ therefore testable without a window.
 | `pnpm tauri dev` | Run with hot reload |
 | `pnpm tauri build` | Installers for the current platform |
 | `pnpm check` | Svelte and TypeScript types |
-| `pnpm test` | 183 unit tests |
+| `pnpm test` | 199 unit tests |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | 171 Rust tests (49 unit + 118 integration against a real database + 4 guarding the docs) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Lints, errors as warnings |
 | `cargo audit` | Vulnerabilities in dependencies |

@@ -5,6 +5,7 @@ import * as taskService from '$services/taskService';
 import * as tabService from '$services/tabService';
 import { t } from '$i18n';
 import { truncate, isClosed } from '$domain/taskRules';
+import { extractNaturalDueDate } from '$domain/naturalDueDate';
 import { settingsStore } from './settingsStore.svelte';
 import { tabStore } from './tabStore.svelte';
 import { uiStore } from './uiStore.svelte';
@@ -131,13 +132,37 @@ class TaskStore {
     await this.load();
   }
 
-  async addRoot(title: string): Promise<boolean> {
+  /**
+   * A title may carry its own deadline: «проверить диски за неделю» keeps the
+   * words «проверить диски» as the title and turns «за неделю» into a due
+   * date, applied through the same command the picker uses. The parse runs
+   * before the row exists; the failure of the date call leaves the task
+   * standing without one — the failure is shown, not hidden, and the task
+   * itself does not vanish for it.
+   */
+  private static async applyParsedDueDate(
+    dueDate: string | null,
+    task: Task,
+  ): Promise<Task> {
+    if (!dueDate) return task;
     try {
-      const task = await taskService.createTask(
+      return await taskService.setTaskDueDate(task.id, dueDate);
+    } catch (e) {
+      taskStore.showError(e);
+      return task;
+    }
+  }
+
+  async addRoot(rawTitle: string): Promise<boolean> {
+    const { dueDate, cleanedTitle } = extractNaturalDueDate(rawTitle);
+    const title = dueDate ? cleanedTitle : rawTitle;
+    try {
+      let task = await taskService.createTask(
         title,
         null,
         untrack(() => tabStore.activeTabId),
       );
+      task = await TaskStore.applyParsedDueDate(dueDate, task);
       // The database decides the position; the optimistic insert mirrors the
       // "newest first" preference so the row does not jump after the reload.
       const newestFirst = untrack(() => settingsStore.newestFirst);
@@ -153,9 +178,12 @@ class TaskStore {
     }
   }
 
-  async addSubtask(parentId: TaskId, title: string): Promise<boolean> {
+  async addSubtask(parentId: TaskId, rawTitle: string): Promise<boolean> {
+    const { dueDate, cleanedTitle } = extractNaturalDueDate(rawTitle);
+    const title = dueDate ? cleanedTitle : rawTitle;
     try {
-      const task = await taskService.createTask(title, parentId, null);
+      let task = await taskService.createTask(title, parentId, null);
+      task = await TaskStore.applyParsedDueDate(dueDate, task);
       // New subtasks go to the bottom of the list, matching the order the
       // database assigns (after the existing ones) and the drag & drop order.
       this.nodes = this.nodes.map((node) =>
