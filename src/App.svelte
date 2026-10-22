@@ -29,6 +29,9 @@
     await taskStore.init();
     // After the window is usable: a slow check must never delay the list.
     void updateStore.checkOnStart();
+    // The launch check covers the first day; this keeps the following days
+    // covered while the window stays open (tray included).
+    updateStore.startPeriodicChecks();
   });
 
   // Switching tabs keeps the query and re-runs it against the new tab.

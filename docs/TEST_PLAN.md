@@ -15,7 +15,7 @@
 | Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 47 |
 | Rust integration | то же | 116 |
 | Rust документация | то же (`tests/documentation.rs`) | 4 |
-| TypeScript | `pnpm test` | 180 |
+| TypeScript | `pnpm test` | 181 |
 
 Числа берутся из фактического прогона. Если они разошлись с таблицей —
 значит, тесты забыли пересчитать, и это такое же расхождение кода и
@@ -171,7 +171,7 @@
 
 ## Тесты TypeScript (vitest)
 
-Двадцать пять файлов, 180 тестов. Ниже перечислены все наборы.
+Двадцать пять файлов, 181 тестов. Ниже перечислены все наборы.
 
 ### `tests/taskValidation.test.ts`
 
@@ -381,6 +381,7 @@ SSR-рендер компонента задачи — проверяет кон
 | `computes progress only when the total size is known` | Прогресс только при известном размере |
 | `forgets everything when dismissed` | Сброс после закрытия баннера |
 | `auto mode needs a release and the opt-in together` | Автоустановка включается и обновлением, и галочкой в настройках |
+| `re-checks only after a full day of open window` | Повторная проверка обновлений не приходит раньше суток |
 
 ### `tests/aboutBody.test.ts`
 
