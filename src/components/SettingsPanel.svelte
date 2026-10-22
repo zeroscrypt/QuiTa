@@ -783,9 +783,19 @@
     margin-bottom: 8px;
     border-bottom: 1px solid var(--border);
     flex: none;
+    /* Пять вкладок в узком окне не умещаются: переносят не подписи, а полосу —
+       она едет горизонтально, каждая подпись остаётся одной строкой. */
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .settings-tabs::-webkit-scrollbar {
+    display: none;
   }
 
   .settings-tab {
+    white-space: nowrap;
     padding: 6px 9px;
     font-size: 12.5px;
     color: var(--text-secondary);
