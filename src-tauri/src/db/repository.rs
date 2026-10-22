@@ -2,7 +2,7 @@ use chrono::Utc;
 use rusqlite::{Connection, OptionalExtension, Row};
 use uuid::Uuid;
 
-use crate::domain::rules::{compute_toggle_plan, TogglePlan};
+use crate::domain::rules::{compute_mark_plan, compute_toggle_plan, MarkPlan, TogglePlan};
 use crate::domain::task::{
     AppSettings, ChildPlacement, DbStats, MatchedSubtask, ReparentReceipt, SearchResult, Tab,
     TabDeletion, TabStat, Task, TaskNode, ToggleOutcome, TrashSweep, TAB_COLORS,
@@ -34,7 +34,7 @@ pub const MAX_TRASH_LIMIT: i64 = 200;
 /// age rule still clears it if they set one.
 pub const TRASH_LIMIT_OFF: i64 = 0;
 
-const TASK_COLUMNS: &str = "id, parent_id, tab_id, title, created_at, updated_at, completed_at, deleted_at, due_date, comment, sort_order, completion_event_id, auto_completed_by";
+const TASK_COLUMNS: &str = "id, parent_id, tab_id, title, created_at, updated_at, completed_at, deleted_at, due_date, comment, sort_order, completion_event_id, auto_completed_by, not_relevant_at, not_relevant_event_id, auto_not_relevant_by";
 
 fn now_rfc3339() -> String {
     Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
@@ -55,6 +55,9 @@ fn row_to_task(row: &Row) -> rusqlite::Result<Task> {
         sort_order: row.get("sort_order")?,
         completion_event_id: row.get("completion_event_id")?,
         auto_completed_by: row.get("auto_completed_by")?,
+        not_relevant_at: row.get("not_relevant_at")?,
+        not_relevant_event_id: row.get("not_relevant_event_id")?,
+        auto_not_relevant_by: row.get("auto_not_relevant_by")?,
     })
 }
 
@@ -147,6 +150,9 @@ pub fn create_task(
         },
         completion_event_id: None,
         auto_completed_by: None,
+        not_relevant_at: None,
+        not_relevant_event_id: None,
+        auto_not_relevant_by: None,
     };
     tx.execute(
         "INSERT INTO tasks (id, parent_id, tab_id, title, search_text, created_at, updated_at, completed_at, deleted_at, due_date, comment, sort_order, completion_event_id, auto_completed_by)
@@ -279,6 +285,59 @@ fn apply_toggle_plan(tx: &Connection, plan: &TogglePlan) -> Result<(), TaskError
     for cid in &plan.children_to_reopen {
         tx.execute(
             "UPDATE tasks SET completed_at = NULL, updated_at = ?1, auto_completed_by = NULL WHERE id = ?2",
+            rusqlite::params![now, cid],
+        )?;
+    }
+    Ok(())
+}
+
+/// Toggles the "не актуальная" mark on a task, mirroring the completion
+/// cascade. Marking a parent auto-marks its not-yet-marked subtasks under a
+/// fresh event id recorded on the parent; unmarking undoes exactly the marks
+/// that event made, leaving hand-marked subtasks alone. See
+/// `compute_mark_plan` in `domain/rules.rs` and docs/TASK_RULES.md.
+pub fn toggle_not_relevance(conn: &mut Connection, id: &str) -> Result<ToggleOutcome, TaskError> {
+    let tx = conn.transaction()?;
+    let target = get_task_row(&tx, id, false)?;
+    let children = list_subtasks_tx(&tx, id)?;
+
+    let plan = compute_mark_plan(&target, &children);
+    apply_mark_plan(&tx, &plan)?;
+
+    let mut updated_ids: Vec<String> = vec![target.id.clone()];
+    updated_ids.extend(plan.children_to_mark.iter().cloned());
+    updated_ids.extend(plan.children_to_unmark.iter().cloned());
+
+    let mut updated = Vec::with_capacity(updated_ids.len());
+    for uid in updated_ids {
+        updated.push(get_task_row(&tx, &uid, false)?);
+    }
+    tx.commit()?;
+    Ok(ToggleOutcome { updated })
+}
+
+fn apply_mark_plan(tx: &Connection, plan: &MarkPlan) -> Result<(), TaskError> {
+    let now = now_rfc3339();
+    if plan.mark {
+        tx.execute(
+            "UPDATE tasks SET not_relevant_at = ?1, not_relevant_event_id = ?2, updated_at = ?1 WHERE id = ?3",
+            rusqlite::params![now, plan.mark_event_id, plan.target_id],
+        )?;
+    } else {
+        tx.execute(
+            "UPDATE tasks SET not_relevant_at = NULL, not_relevant_event_id = NULL, updated_at = ?1 WHERE id = ?2",
+            rusqlite::params![now, plan.target_id],
+        )?;
+    }
+    for cid in &plan.children_to_mark {
+        tx.execute(
+            "UPDATE tasks SET not_relevant_at = ?1, auto_not_relevant_by = ?2, updated_at = ?1 WHERE id = ?3",
+            rusqlite::params![now, plan.mark_event_id, cid],
+        )?;
+    }
+    for cid in &plan.children_to_unmark {
+        tx.execute(
+            "UPDATE tasks SET not_relevant_at = NULL, auto_not_relevant_by = NULL, updated_at = ?1 WHERE id = ?2",
             rusqlite::params![now, cid],
         )?;
     }
@@ -449,10 +508,13 @@ pub fn list_roots(
     tab_id: Option<&str>,
 ) -> Result<Vec<Task>, TaskError> {
     // `tab_id = None` means "every tab"; a specific id filters to that tab.
+    // "Closed" is either completion or the "не актуальная" mark, so both
+    // timestamps gate the hidden branch; the showing branch filters nothing,
+    // exactly like completed tasks.
     let sql = if include_completed {
         format!("SELECT {TASK_COLUMNS} FROM tasks WHERE parent_id IS NULL AND deleted_at IS NULL AND (?1 IS NULL OR tab_id = ?1) ORDER BY sort_order ASC")
     } else {
-        format!("SELECT {TASK_COLUMNS} FROM tasks WHERE parent_id IS NULL AND deleted_at IS NULL AND completed_at IS NULL AND (?1 IS NULL OR tab_id = ?1) ORDER BY sort_order ASC")
+        format!("SELECT {TASK_COLUMNS} FROM tasks WHERE parent_id IS NULL AND deleted_at IS NULL AND completed_at IS NULL AND not_relevant_at IS NULL AND (?1 IS NULL OR tab_id = ?1) ORDER BY sort_order ASC")
     };
     let mut stmt = conn.prepare(&sql)?;
     let tasks = stmt
@@ -570,15 +632,16 @@ pub fn purge_completed_tasks(
              FROM tasks AS root
              WHERE root.parent_id IS NULL
                AND root.deleted_at IS NULL
-               AND root.completed_at IS NOT NULL
+               AND (root.completed_at IS NOT NULL OR root.not_relevant_at IS NOT NULL)
                AND NOT EXISTS (
                    SELECT 1 FROM tasks AS open
                    WHERE open.deleted_at IS NULL
                      AND open.completed_at IS NULL
+                     AND open.not_relevant_at IS NULL
                      AND (open.id = root.id OR open.parent_id = root.id)
                )
                AND datetime((
-                   SELECT MAX(closed.completed_at) FROM tasks AS closed
+                   SELECT MAX(COALESCE(closed.completed_at, closed.not_relevant_at)) FROM tasks AS closed
                    WHERE closed.deleted_at IS NULL
                      AND (closed.id = root.id OR closed.parent_id = root.id)
                )) < datetime('now', ?1)"
@@ -1179,7 +1242,8 @@ pub fn search_tasks(
 
     let mut stmt = conn.prepare(&format!(
         "SELECT {TASK_COLUMNS} FROM tasks
-         WHERE parent_id IS NULL AND deleted_at IS NULL AND completed_at IS NULL
+         WHERE parent_id IS NULL AND deleted_at IS NULL
+            AND completed_at IS NULL AND not_relevant_at IS NULL
            AND (?2 IS NULL OR tab_id = ?2)
            AND search_text LIKE ?1 ESCAPE '\\'
          ORDER BY sort_order ASC"
@@ -1195,15 +1259,22 @@ pub fn search_tasks(
                     t.due_date AS t_due_date, t.comment AS t_comment, t.sort_order AS t_sort_order,
                     t.completion_event_id AS t_completion_event_id,
                     t.auto_completed_by AS t_auto_completed_by,
+                    t.not_relevant_at AS t_not_relevant_at,
+                    t.not_relevant_event_id AS t_not_relevant_event_id,
+                    t.auto_not_relevant_by AS t_auto_not_relevant_by,
                     p.id AS p_id, p.parent_id AS p_parent_id, p.title AS p_title,
                     p.created_at AS p_created_at, p.updated_at AS p_updated_at,
                     p.completed_at AS p_completed_at, p.deleted_at AS p_deleted_at,
                     p.due_date AS p_due_date, p.comment AS p_comment, p.sort_order AS p_sort_order,
                     p.completion_event_id AS p_completion_event_id,
-                    p.auto_completed_by AS p_auto_completed_by
+                    p.auto_completed_by AS p_auto_completed_by,
+                    p.not_relevant_at AS p_not_relevant_at,
+                    p.not_relevant_event_id AS p_not_relevant_event_id,
+                    p.auto_not_relevant_by AS p_auto_not_relevant_by
              FROM tasks t
              JOIN tasks p ON p.id = t.parent_id
-             WHERE t.parent_id IS NOT NULL AND t.deleted_at IS NULL AND t.completed_at IS NULL
+             WHERE t.parent_id IS NOT NULL AND t.deleted_at IS NULL
+               AND t.completed_at IS NULL AND t.not_relevant_at IS NULL
                AND (?2 IS NULL OR t.tab_id = ?2)
                AND t.search_text LIKE ?1 ESCAPE '\\'
              ORDER BY t.sort_order ASC",
@@ -1224,6 +1295,9 @@ pub fn search_tasks(
                 sort_order: row.get("t_sort_order")?,
                 completion_event_id: row.get("t_completion_event_id")?,
                 auto_completed_by: row.get("t_auto_completed_by")?,
+                not_relevant_at: row.get("t_not_relevant_at")?,
+                not_relevant_event_id: row.get("t_not_relevant_event_id")?,
+                auto_not_relevant_by: row.get("t_auto_not_relevant_by")?,
             };
             let parent = Task {
                 id: row.get("p_id")?,
@@ -1239,6 +1313,9 @@ pub fn search_tasks(
                 sort_order: row.get("p_sort_order")?,
                 completion_event_id: row.get("p_completion_event_id")?,
                 auto_completed_by: row.get("p_auto_completed_by")?,
+                not_relevant_at: row.get("p_not_relevant_at")?,
+                not_relevant_event_id: row.get("p_not_relevant_event_id")?,
+                auto_not_relevant_by: row.get("p_auto_not_relevant_by")?,
             };
             Ok(MatchedSubtask { task, parent })
         })?
@@ -1923,8 +2000,9 @@ pub fn import_tasks(
                 "UPDATE tasks SET parent_id = ?1, tab_id = ?2, title = ?3, search_text = ?4,
                         updated_at = ?5, completed_at = ?6, deleted_at = ?7, due_date = ?8,
                         comment = ?9, sort_order = ?10, completion_event_id = ?11,
-                        auto_completed_by = ?12
-                 WHERE id = ?13",
+                        auto_completed_by = ?12, not_relevant_at = ?13,
+                        not_relevant_event_id = ?14, auto_not_relevant_by = ?15
+                 WHERE id = ?16",
                 rusqlite::params![
                     parent_id,
                     tab_id,
@@ -1938,6 +2016,9 @@ pub fn import_tasks(
                     sort_order,
                     task.completion_event_id,
                     task.auto_completed_by,
+                    task.not_relevant_at,
+                    task.not_relevant_event_id,
+                    task.auto_not_relevant_by,
                     task.id
                 ],
             )?;
@@ -1946,8 +2027,9 @@ pub fn import_tasks(
             tx.execute(
                 "INSERT INTO tasks (id, parent_id, tab_id, title, search_text, created_at,
                         updated_at, completed_at, deleted_at, due_date, comment, sort_order,
-                        completion_event_id, auto_completed_by)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                        completion_event_id, auto_completed_by, not_relevant_at,
+                        not_relevant_event_id, auto_not_relevant_by)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
                 rusqlite::params![
                     task.id,
                     parent_id,
@@ -1962,7 +2044,10 @@ pub fn import_tasks(
                     comment,
                     sort_order,
                     task.completion_event_id,
-                    task.auto_completed_by
+                    task.auto_completed_by,
+                    task.not_relevant_at,
+                    task.not_relevant_event_id,
+                    task.auto_not_relevant_by
                 ],
             )?;
             added += 1;
@@ -2082,7 +2167,7 @@ pub fn tab_stats(conn: &Connection) -> Result<Vec<TabStat>, TaskError> {
     let mut stmt = conn.prepare(
         "SELECT t.id AS tab_id,
                 COUNT(tasks.id) AS total,
-                SUM(CASE WHEN tasks.completed_at IS NOT NULL THEN 1 ELSE 0 END) AS done
+                SUM(CASE WHEN tasks.completed_at IS NOT NULL OR tasks.not_relevant_at IS NOT NULL THEN 1 ELSE 0 END) AS done
          FROM tabs t
          LEFT JOIN tasks ON tasks.tab_id = t.id AND tasks.deleted_at IS NULL
          GROUP BY t.id

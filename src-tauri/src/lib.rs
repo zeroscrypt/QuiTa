@@ -81,6 +81,7 @@ pub fn run() {
             commands::task_commands::create_task,
             commands::task_commands::rename_task,
             commands::task_commands::toggle_task_completion,
+            commands::task_commands::toggle_task_not_relevance,
             commands::task_commands::set_task_due_date,
             commands::task_commands::set_task_comment,
             commands::task_commands::soft_delete_task,

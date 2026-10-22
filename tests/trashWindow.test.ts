@@ -25,6 +25,9 @@ function task(id: string) {
     sortOrder: 0,
     completionEventId: null,
     autoCompletedBy: null,
+    notRelevantAt: null,
+    notRelevantEventId: null,
+    autoNotRelevantBy: null,
   };
 }
 

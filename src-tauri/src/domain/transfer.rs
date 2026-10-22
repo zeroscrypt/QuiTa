@@ -86,6 +86,9 @@ mod tests {
                 sort_order: -1,
                 completion_event_id: None,
                 auto_completed_by: None,
+                not_relevant_at: None,
+                not_relevant_event_id: None,
+                auto_not_relevant_by: None,
             }],
             tabs: Some(vec![Tab {
                 id: "tab1".to_string(),

@@ -31,6 +31,20 @@ pub struct Task {
     /// For subtasks only: completion event id of the parent that
     /// auto-completed this subtask. NULL means the user completed it manually.
     pub auto_completed_by: Option<String>,
+    /// The task is deliberately kept but will not be done: "не актуальная".
+    /// Red, dimmed, a cross in the checkbox — and treated as closed everywhere
+    /// a completed task is, because the user pointed at the closed state as
+    /// the model to follow.
+    #[serde(default)]
+    pub not_relevant_at: Option<String>,
+    /// Set on a root task when its children were auto-marked by a parent
+    /// "не актуальная" event, so unmarking can undo exactly its own marks.
+    #[serde(default)]
+    pub not_relevant_event_id: Option<String>,
+    /// For subtasks only: the parent mark event that auto-marked this
+    /// subtask. NULL means the user marked it with their own hand.
+    #[serde(default)]
+    pub auto_not_relevant_by: Option<String>,
 }
 
 impl Task {
@@ -40,6 +54,17 @@ impl Task {
 
     pub fn is_completed(&self) -> bool {
         self.completed_at.is_some()
+    }
+
+    pub fn is_not_relevant(&self) -> bool {
+        self.not_relevant_at.is_some()
+    }
+
+    /// Closed in the sense every list, counter and timer uses: done by hand
+    /// or retired as irrelevant. The two paths are different gestures with the
+    /// same consequence, and the UI says which one happened.
+    pub fn is_closed(&self) -> bool {
+        self.is_completed() || self.is_not_relevant()
     }
 
     pub fn is_deleted(&self) -> bool {
@@ -260,6 +285,9 @@ mod tests {
             sort_order: -1,
             completion_event_id: None,
             auto_completed_by: None,
+            not_relevant_at: None,
+            not_relevant_event_id: None,
+            auto_not_relevant_by: None,
         }
     }
 

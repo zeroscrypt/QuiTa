@@ -38,6 +38,7 @@ export function shortcutRows(
     { keys: [mod, "T"], labelKey: "shortcuts.newTab" },
     { keys: [mod, "F"], labelKey: "shortcuts.search" },
     { keys: [mod, "S"], labelKey: "shortcuts.settings" },
+    { keys: [mod, "D"], labelKey: "shortcuts.markNotRelevant" },
     { keys: ["Enter"], labelKey: "shortcuts.create" },
     { keys: ["Esc"], labelKey: "shortcuts.closeLayer" },
   ].filter((row) => row.keys[0] !== "") as ShortcutRow[];

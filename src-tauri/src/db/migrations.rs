@@ -143,6 +143,20 @@ BEGIN
 END;
 "#,
     },
+    Migration {
+        version: 7,
+        name: "add_not_relevant",
+        sql: r#"
+    -- A task deliberately kept but never to be done: "не актуальная". The
+    -- three columns mirror the completion columns one for one (timestamp,
+    -- parent mark event, auto-marked-by child), so unmarking can undo exactly
+    -- what the parent's mark did. Existing rows stay NULL: nothing was
+    -- irrelevant before this mark existed.
+    ALTER TABLE tasks ADD COLUMN not_relevant_at TEXT;
+    ALTER TABLE tasks ADD COLUMN not_relevant_event_id TEXT;
+    ALTER TABLE tasks ADD COLUMN auto_not_relevant_by TEXT;
+    "#,
+    },
 ];
 
 /// Applies all pending migrations in order. Migration records are inserted

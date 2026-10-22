@@ -18,6 +18,9 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     sortOrder: -1,
     completionEventId: null,
     autoCompletedBy: null,
+    notRelevantAt: null,
+    notRelevantEventId: null,
+    autoNotRelevantBy: null,
     ...overrides,
   };
 }
@@ -44,6 +47,29 @@ describe('TaskItem rendering', () => {
     const body = renderItem(makeTask({ dueDate: '2020-01-01' }));
     expect(body).toContain('2020-01-01');
     expect(body).toContain('Срок истёк');
+  });
+
+  it('renders a marked task red and dim, and does not call it checked', () => {
+    // "Не актуальная" is not completion: no check, no strikethrough — a red
+    // cross on an open box instead.
+    const body = renderItem(makeTask({ notRelevantAt: '2026-01-02T00:00:00Z' }));
+    expect(body).toContain('task-row not-relevant');
+    expect(body).not.toContain('task-row completed');
+    expect(body).toContain('aria-checked="false"');
+    expect(body).toContain('M2.5 2.5l7 7'); // the cross path
+  });
+
+  it('keeps the red cross on a task closed in both senses', () => {
+    const body = renderItem(
+      makeTask({
+        completedAt: '2026-01-02T00:00:00Z',
+        notRelevantAt: '2026-01-02T00:00:00Z',
+      }),
+    );
+    // The look is the mark's, not the strikethrough's; one closure, red.
+    expect(body).toContain('task-row not-relevant');
+    expect(body).toContain('aria-checked="true"');
+    expect(body).toContain('M2.5 2.5l7 7');
   });
 
   it('offers subtask creation for roots and counts the parent in progress', () => {

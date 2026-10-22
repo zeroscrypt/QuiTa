@@ -21,6 +21,12 @@ export interface Task {
   completionEventId: string | null;
   /** For subtasks: completion event of the parent that auto-completed it. */
   autoCompletedBy: string | null;
+  /** The task is kept on purpose but will not be done: "не актуальная". */
+  notRelevantAt: string | null;
+  /** Identifies the parent mark event that marked this task's children. */
+  notRelevantEventId: string | null;
+  /** For subtasks: mark event of the parent that auto-marked it. */
+  autoNotRelevantBy: string | null;
 }
 
 /** A tab groups tasks by topic or project. */

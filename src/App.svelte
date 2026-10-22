@@ -92,7 +92,15 @@
       event.preventDefault();
       if (asked === "newTab") uiStore.requestNewTab();
       else if (asked === "focusSearch") uiStore.requestFocusSearch();
-      else uiStore.openSettings();
+      else if (asked === "settings") uiStore.openSettings();
+      else {
+        // The mark works on the last row the user pressed. Without a pressed
+        // row the shortcut is a honest no-op: a hotkey that guesses a target
+        // would mark a task the user never pointed at.
+        if (taskStore.selectedTaskId !== null) {
+          void taskStore.toggleNotRelevant(taskStore.selectedTaskId);
+        }
+      }
       return;
     }
 

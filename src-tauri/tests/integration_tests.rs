@@ -20,7 +20,7 @@ fn open_test_db() -> Connection {
 
 fn active_task(conn: &Connection, id: &str) -> Task {
     conn.query_row(
-        "SELECT id, parent_id, tab_id, title, created_at, updated_at, completed_at, deleted_at, due_date, comment, sort_order, completion_event_id, auto_completed_by
+        "SELECT id, parent_id, tab_id, title, created_at, updated_at, completed_at, deleted_at, due_date, comment, sort_order, completion_event_id, auto_completed_by, not_relevant_at, not_relevant_event_id, auto_not_relevant_by
          FROM tasks WHERE id = ?1 AND deleted_at IS NULL",
         [id],
         |row| {
@@ -38,6 +38,9 @@ fn active_task(conn: &Connection, id: &str) -> Task {
                 sort_order: row.get("sort_order")?,
                 completion_event_id: row.get("completion_event_id")?,
                 auto_completed_by: row.get("auto_completed_by")?,
+                not_relevant_at: row.get("not_relevant_at")?,
+                not_relevant_event_id: row.get("not_relevant_event_id")?,
+                auto_not_relevant_by: row.get("auto_not_relevant_by")?,
             })
         },
     )
@@ -771,6 +774,9 @@ fn an_import_cannot_smuggle_an_oversized_comment() {
         sort_order: 0,
         completion_event_id: None,
         auto_completed_by: None,
+        not_relevant_at: None,
+        not_relevant_event_id: None,
+        auto_not_relevant_by: None,
     };
 
     repository::import_tasks(&mut conn, &[task]).unwrap();
@@ -823,6 +829,9 @@ fn an_import_cannot_make_a_task_its_own_parent() {
         sort_order: 0,
         completion_event_id: None,
         auto_completed_by: None,
+        not_relevant_at: None,
+        not_relevant_event_id: None,
+        auto_not_relevant_by: None,
     };
 
     repository::import_tasks(&mut conn, &[make()]).unwrap();
@@ -889,6 +898,9 @@ fn an_import_cannot_push_the_next_task_off_the_end_of_the_scale() {
         sort_order: i64::MAX,
         completion_event_id: None,
         auto_completed_by: None,
+        not_relevant_at: None,
+        not_relevant_event_id: None,
+        auto_not_relevant_by: None,
     };
     repository::import_tasks(&mut conn, &[edge]).unwrap();
 
@@ -930,6 +942,9 @@ fn a_new_task_below_an_extreme_import_does_not_underflow() {
         sort_order: i64::MIN,
         completion_event_id: None,
         auto_completed_by: None,
+        not_relevant_at: None,
+        not_relevant_event_id: None,
+        auto_not_relevant_by: None,
     };
     repository::import_tasks(&mut conn, &[edge]).unwrap();
     let created =
@@ -966,6 +981,9 @@ fn an_import_keeps_a_comment_inside_the_limit() {
         sort_order: 0,
         completion_event_id: None,
         auto_completed_by: None,
+        not_relevant_at: None,
+        not_relevant_event_id: None,
+        auto_not_relevant_by: None,
     };
     repository::import_tasks(&mut conn, &[task]).unwrap();
     let stored: Option<String> = conn
@@ -1928,6 +1946,9 @@ fn toggle_plan_children_are_filtered_correctly() {
         sort_order: 0,
         completion_event_id: None,
         auto_completed_by: None,
+        not_relevant_at: None,
+        not_relevant_event_id: None,
+        auto_not_relevant_by: None,
     };
     let parent = make("p", false);
     let open_child = make("c1", false);
@@ -2580,6 +2601,9 @@ fn import_repairs_broken_hierarchy_instead_of_dropping_tasks() {
         sort_order: 0,
         completion_event_id: None,
         auto_completed_by: None,
+        not_relevant_at: None,
+        not_relevant_event_id: None,
+        auto_not_relevant_by: None,
     };
 
     let (added, _, skipped) = repository::import_tasks(&mut conn, &[orphan]).unwrap();
@@ -2902,6 +2926,9 @@ fn task_json(id: &str, title: &str) -> Task {
         sort_order: 0,
         completion_event_id: None,
         auto_completed_by: None,
+        not_relevant_at: None,
+        not_relevant_event_id: None,
+        auto_not_relevant_by: None,
     }
 }
 
@@ -3036,4 +3063,117 @@ fn the_trash_limit_is_stored_and_clamped_to_its_range() {
     settings.trash_limit = 9999;
     repository::update_settings(&mut conn, &settings).unwrap();
     assert_eq!(repository::get_settings(&conn).unwrap().trash_limit, 200);
+}
+
+#[test]
+fn marking_not_relevant_hides_the_task_and_counts_it_as_done() {
+    // The user's rule: a marked task sits where a completed one sits --
+    // hidden while "show completed" is off, counted by the tab badge, and
+    // invisible to search. Three different queries, one expectation.
+    let mut conn = open_test_db();
+    let parent = repository::create_task(&mut conn, "Пометить", None, None, true).unwrap();
+    let child = repository::create_task(&mut conn, "Под", Some(&parent.id), None, true).unwrap();
+    let _ = child;
+
+    repository::toggle_not_relevance(&mut conn, &parent.id).unwrap();
+
+    let marked = active_task(&conn, &parent.id);
+    assert!(marked.is_not_relevant());
+    assert!(!marked.is_completed(), "the mark never touches completion");
+
+    // Hidden from the ordinary list...
+    assert!(repository::list_roots(&conn, false, None)
+        .unwrap()
+        .is_empty());
+    // ...visible where completed tasks appear...
+    let shown = repository::list_roots(&conn, true, None).unwrap();
+    assert_eq!(shown.len(), 1);
+    assert!(shown[0].is_not_relevant());
+
+    // ...counted by the tab badge as closed...
+    let stat = repository::tab_stats(&conn).unwrap();
+    assert_eq!(stat[0].total, 2);
+    assert_eq!(stat[0].done, 2);
+
+    // ...and invisible to search, like any closed task.
+    let found = repository::search_tasks(&conn, "Пометить", None).unwrap();
+    assert!(found.roots.is_empty());
+}
+
+#[test]
+fn marking_a_parent_cascades_and_unmarking_restores_only_auto_marks() {
+    // The mirror of the completion cascade: children the mark event carried
+    // along come back when the mark is lifted, hand-made marks stay.
+    let mut conn = open_test_db();
+    let parent = repository::create_task(&mut conn, "Род", None, None, true).unwrap();
+    let open =
+        repository::create_task(&mut conn, "Открытая", Some(&parent.id), None, true).unwrap();
+    let hand = repository::create_task(&mut conn, "Ручная", Some(&parent.id), None, true).unwrap();
+    let done =
+        repository::create_task(&mut conn, "Завершённая", Some(&parent.id), None, true).unwrap();
+
+    // A by-hand mark before the parent's mark, so the mark event cannot claim it.
+    repository::toggle_not_relevance(&mut conn, &hand.id).unwrap();
+    // And a hand completion, which the mark must not undo later.
+    repository::toggle_completion(&mut conn, &done.id, true).unwrap();
+
+    repository::toggle_not_relevance(&mut conn, &parent.id).unwrap();
+
+    let marked = active_task(&conn, &parent.id);
+    assert!(marked.is_not_relevant());
+    // The event exists: three subtasks moved under it.
+    assert!(marked.not_relevant_event_id.is_some());
+    let auto = active_task(&conn, &open.id);
+    assert!(auto.is_not_relevant());
+    assert_eq!(
+        auto.auto_not_relevant_by.as_deref(),
+        marked.not_relevant_event_id.as_deref()
+    );
+    // A completed subtask keeps both facts: done by hand, then marked.
+    let done_after = active_task(&conn, &done.id);
+    assert!(done_after.is_completed() && done_after.is_not_relevant());
+    // The hand mark keeps its own story: no auto_not_relevant_by.
+    assert!(active_task(&conn, &hand.id).auto_not_relevant_by.is_none());
+
+    // Lifting the parent's mark restores exactly what it marked.
+    repository::toggle_not_relevance(&mut conn, &parent.id).unwrap();
+    assert!(!active_task(&conn, &parent.id).is_not_relevant());
+    assert!(!active_task(&conn, &open.id).is_not_relevant());
+    assert!(
+        !active_task(&conn, &done.id).is_not_relevant(),
+        "its completion stays"
+    );
+    assert!(
+        active_task(&conn, &hand.id).is_not_relevant(),
+        "the hand mark survives"
+    );
+}
+
+#[test]
+fn the_completion_timer_sweeps_marked_tasks_the_same_way() {
+    // "Статус как у закрытой" reaches the cleanup timer too: a task marked
+    // long ago leaves for the bin once the days pass, and a fresh mark stays.
+    let mut conn = open_test_db();
+    let old = repository::create_task(&mut conn, "Давняя", None, None, true).unwrap();
+    let fresh = repository::create_task(&mut conn, "Свежая", None, None, true).unwrap();
+    let child = repository::create_task(&mut conn, "Реакция", Some(&fresh.id), None, true).unwrap();
+    let _ = child;
+
+    let now_ago = chrono::Utc::now() - chrono::Duration::days(30);
+    conn.execute(
+        "UPDATE tasks SET not_relevant_at = ?1 WHERE id = ?2",
+        rusqlite::params![now_ago.to_rfc3339(), old.id],
+    )
+    .unwrap();
+    repository::toggle_not_relevance(&mut conn, &fresh.id).unwrap();
+
+    let sweep = repository::purge_completed_tasks(&mut conn, 7, 200).unwrap();
+    assert_eq!(
+        sweep.moved.len(),
+        1,
+        "only the stale family went to the bin"
+    );
+    assert_eq!(sweep.moved[0].id, old.id);
+    assert!(deleted_at_of(&conn, &old.id).is_some());
+    assert!(deleted_at_of(&conn, &fresh.id).is_none());
 }
