@@ -17,7 +17,7 @@
      */
     partial?: boolean;
     /**
-     * Marked "не актуальная": shown as a red cross.
+     * Marked "не актуально": shown as a red cross.
      *
      * The mark deliberately wins over `partial`: a red task with a dash would
      * read as an alarm with a footnote, and the other way around as done with
@@ -44,7 +44,7 @@
 >
   <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
     {#if notRelevant}
-      <!-- Не актуальная: a white cross on a red fill — same contrast as the
+      <!-- Не актуально: a white cross on a red fill — same contrast as the
            check mark on a completed task, only red. The mark must stay
            readable while the text of the row is dimmed. -->
       <path

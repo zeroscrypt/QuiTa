@@ -89,7 +89,7 @@
 | `completed_parent_can_receive_new_subtasks` | Завершённый родитель подзадачи принимает — строка читается как «частично выполнено» |
 | `cascade_disabled_completes_only_the_parent` | Без каскада подзадачи остаются как были |
 
-### Статус «Не актуальная»
+### Статус «Не актуально»
 
 | Тест | Что проверяет |
 |------|---------------|
@@ -233,10 +233,10 @@
 | `canHaveSubtasks` — allows active root tasks | Активные корневые задачи |
 | `canHaveSubtasks` — forbids subtasks (only one level) | Запрет второго уровня |
 | `canHaveSubtasks` — allows completed roots to receive more subtasks | Завершённый родитель подзадачи принимает |
-| «не актуальная» — reads the mark and the two closures as one closed state | Пометка и завершение дают один статус «закрыто» |
-| «не актуальная» — counts marked subtasks in the stats, like closed ones | Пометка считается в статистике подзадач |
-| «не актуальная» — keeps the progress badge honest for a marked parent | Прогресс считает закрытие любым путём |
-| «не актуальная» — a mark retires the work, so the parent is not "partially done" | Пометка убирает работу из «частично выполнено» |
+| «не актуально» — reads the mark and the two closures as one closed state | Пометка и завершение дают один статус «закрыто» |
+| «не актуально» — counts marked subtasks in the stats, like closed ones | Пометка считается в статистике подзадач |
+| «не актуально» — keeps the progress badge honest for a marked parent | Прогресс считает закрытие любым путём |
+| «не актуально» — a mark retires the work, so the parent is not "partially done" | Пометка убирает работу из «частично выполнено» |
 
 ### `tests/taskItem.test.ts`
 
@@ -247,7 +247,7 @@ SSR-рендер компонента задачи — проверяет кон
 | `renders an open task as unchecked` | `aria-checked="false"`, нет класса `completed` |
 | `renders a completed task as checked` | Завершённая задача отмечена |
 | `marks an overdue task and shows its calendar date` | Подсветка просрочки и дата в формате YYYY-MM-DD |
-| `renders a marked task red and dim, and does not call it checked` | «Не актуальная»: красная строка, белый крест на красной заливке и подпись тем же мелким шрифтом, что и дата, без галочки и зачёркивания |
+| `renders a marked task red and dim, and does not call it checked` | «Не актуально»: красная строка, белый крест на красной заливке и подпись тем же мелким шрифтом, что и дата, без галочки и зачёркивания |
 | `keeps the red cross on a task closed in both senses` | Завершённая и помеченная задача выглядит красной, а не серой |
 | `offers subtask creation for roots and counts the parent in progress` | Прогресс и кнопка подзадачи у корневой задачи |
 | `marks a completed task with open subtasks as partially done` | Состояние «частично выполнено» |

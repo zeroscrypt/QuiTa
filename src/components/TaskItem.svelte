@@ -208,7 +208,7 @@
   });
 
   // The menu holds actions without a one-click control in the row: the
-  // "не актуальная" toggle, the auto-delete setting, reorder and delete.
+  // "не актуально" toggle, the auto-delete setting, reorder and delete.
   // Renaming (double click), due date (calendar button), adding a subtask (+)
   // and expanding (chevron) are all reachable directly from the row.
   const menuItems: Item[] = $derived([
@@ -348,7 +348,7 @@
 
     {#if notRelevant}
       <!-- The state spelled out, in the same small font as the date chip: the
-           cross says "closed", the word says "не актуальная" — a status that
+           cross says "closed", the word says "не актуально" — a status that
            should be readable without decoding icons. -->
       <span class="mark-badge">{t('task.markNotRelevant')}</span>
     {/if}

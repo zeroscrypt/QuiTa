@@ -24,7 +24,7 @@ export function getSubtaskStats(children: Task[]): SubtaskStats {
  * the badge reads "3/4", never "2/3".
  *
  * `taskClosed` is whether the parent itself counts as done — by hand or by
- * the "не актуальная" mark. Both closures count the same way here.
+ * the "не актуально" mark. Both closures count the same way here.
  */
 export function formatProgress(stats: SubtaskStats, taskClosed = false): string | null {
   if (stats.total === 0) return null;
@@ -38,7 +38,7 @@ export function formatProgress(stats: SubtaskStats, taskClosed = false): string 
  * below it), so it gets its own look instead of looking plain completed.
  *
  * A subtask counts as open unless it is closed in either sense — completed
- * or marked "не актуальная". The mark retires the work, it does not leave
+ * or marked "не актуально". The mark retires the work, it does not leave
  * a "partially done" row behind.
  */
 export function isPartiallyDone(task: Task, children: Task[]): boolean {
@@ -74,7 +74,7 @@ export function isCompleted(task: Task): boolean {
   return task.completedAt !== null;
 }
 
-/** Marked "не актуальная": kept on purpose, but the work is retired. */
+/** Marked "не актуально": kept on purpose, but the work is retired. */
 export function isNotRelevant(task: Task): boolean {
   return task.notRelevantAt !== null;
 }
