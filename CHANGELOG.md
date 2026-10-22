@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/zeroscrypt/QuiTa/compare/v1.5.0...v1.5.1) (2026-10-22)
+
+
+### Исправлено
+
+* **выпуск:** манифест обновления собирается из подписей заново ([#40](https://github.com/zeroscrypt/QuiTa/issues/40)) ([75e09cd](https://github.com/zeroscrypt/QuiTa/commit/75e09cd436a4a7586e0b56b19da72e37ea08840f))
+
 ## [1.5.0](https://github.com/zeroscrypt/QuiTa/compare/v1.4.1...v1.5.0) (2026-10-17)
 
 
