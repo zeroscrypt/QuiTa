@@ -11,6 +11,8 @@ class SettingsStore {
   showTabCounts = $state(true);
   newestFirst = $state(true);
   autoUpdate = $state(false);
+  backupEnabled = $state(false);
+  backupCopies = $state(3);
   autoDeleteDays = $state<number | null>(null);
   trashLimit = $state(200);
   trashRetentionDays = $state<number | null>(null);
@@ -27,6 +29,8 @@ class SettingsStore {
       this.showTabCounts = settings.showTabCounts ?? true;
       this.newestFirst = settings.newestFirst ?? true;
       this.autoUpdate = settings.autoUpdate ?? false;
+      this.backupEnabled = settings.backupEnabled ?? false;
+      this.backupCopies = settings.backupCopies ?? 3;
       this.autoDeleteDays = settings.autoDeleteDays ?? null;
       this.trashLimit = settings.trashLimit ?? 200;
       this.trashRetentionDays = settings.trashRetentionDays ?? null;
@@ -97,6 +101,21 @@ class SettingsStore {
   }
 
   /**
+   * Opt-in: a copy at launch, at most once a day. Something that writes files
+   * every run must not come on with an absent setting.
+   */
+  async setBackupEnabled(value: boolean): Promise<void> {
+    this.backupEnabled = value;
+    await this.persist();
+  }
+
+  /** One copy is the floor, thirty the ceiling — mirrored in the storage. */
+  async setBackupCopies(count: number): Promise<void> {
+    this.backupCopies = Math.min(30, Math.max(1, Math.trunc(count)));
+    await this.persist();
+  }
+
+  /**
    * `null` keeps what is in the trash until the user says otherwise. The default
    * is `null` on purpose: a deletion nobody asked for must not follow from a
    * setting nobody filled in.
@@ -130,6 +149,8 @@ class SettingsStore {
       showTabCounts: this.showTabCounts,
       newestFirst: this.newestFirst,
       autoUpdate: this.autoUpdate,
+      backupEnabled: this.backupEnabled,
+      backupCopies: this.backupCopies,
       autoDeleteDays: this.autoDeleteDays,
       trashLimit: this.trashLimit,
       trashRetentionDays: this.trashRetentionDays,

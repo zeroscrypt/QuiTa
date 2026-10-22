@@ -27,6 +27,10 @@ const SORT_ORDER_LIMIT: i64 = 1 << 40;
 /// make the silent loss slower to arrive.
 pub const DEFAULT_TRASH_LIMIT: i64 = 200;
 pub const MAX_TRASH_LIMIT: i64 = 200;
+
+pub const DEFAULT_BACKUP_COPIES: i64 = 3;
+pub const MIN_BACKUP_COPIES: i64 = 1;
+pub const MAX_BACKUP_COPIES: i64 = 30;
 /// Zero is not "keep nothing" but "do not evict by size at all", which is why
 /// the range starts here rather than at one. A trash that keeps nothing would
 /// destroy every task the moment it was deleted, with the undo notice still on
@@ -1811,6 +1815,20 @@ pub fn get_settings(conn: &Connection) -> Result<AppSettings, TaskError> {
             |row| row.get(0),
         )
         .optional()?;
+    let backup_enabled: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'backup_enabled'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let backup_copies: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'backup_copies'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
     Ok(AppSettings {
         theme: theme.unwrap_or_else(|| "system".to_string()),
         show_completed: show_completed.as_deref() == Some("1"),
@@ -1833,6 +1851,13 @@ pub fn get_settings(conn: &Connection) -> Result<AppSettings, TaskError> {
         newest_first: newest_first.as_deref() != Some("0"),
         // Updates stay behind the banner unless the user opted in.
         auto_update: auto_update.as_deref() == Some("1"),
+        // A copy at launch needs an explicit opt-in: something that writes
+        // files without being asked is not a habit this app starts.
+        backup_enabled: backup_enabled.as_deref() == Some("1"),
+        backup_copies: backup_copies
+            .and_then(|v| v.parse::<i64>().ok())
+            .unwrap_or(DEFAULT_BACKUP_COPIES)
+            .clamp(MIN_BACKUP_COPIES, MAX_BACKUP_COPIES),
     })
 }
 
@@ -1909,6 +1934,19 @@ pub fn update_settings(
         "INSERT INTO settings (key, value) VALUES ('auto_update', ?1)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         [flag(settings.auto_update)],
+    )?;
+    tx.execute(
+        "INSERT INTO settings (key, value) VALUES ('backup_enabled', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [flag(settings.backup_enabled)],
+    )?;
+    tx.execute(
+        "INSERT INTO settings (key, value) VALUES ('backup_copies', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [settings
+            .backup_copies
+            .clamp(MIN_BACKUP_COPIES, MAX_BACKUP_COPIES)
+            .to_string()],
     )?;
     tx.commit()?;
     get_settings(conn)

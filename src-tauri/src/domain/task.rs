@@ -179,6 +179,23 @@ pub struct AppSettings {
     /// stay behind the banner until the user opts in.
     #[serde(default)]
     pub auto_update: bool,
+    /// When true, a copy of the database is taken at launch if the newest
+    /// stored one is older than a day. Default false: backups wait for an
+    /// explicit opt-in, like every rule that touches the user's files.
+    #[serde(default)]
+    pub backup_enabled: bool,
+    /// How many copies the rotation keeps before deleting the oldest. A zero
+    /// would mean "never keep anything", which is not a backup policy, so it
+    /// is clamped on both the write and the read path.
+    #[serde(default = "default_backup_copies")]
+    pub backup_copies: i64,
+}
+
+/// The rotation keeps three generations unless the user says otherwise: one
+/// copy is not a history (a corruption that gets copied in is copied for
+/// good), and a higher default spends disk the user did not ask to spend.
+fn default_backup_copies() -> i64 {
+    crate::db::repository::DEFAULT_BACKUP_COPIES
 }
 
 impl Default for AppSettings {
@@ -195,6 +212,8 @@ impl Default for AppSettings {
             show_tab_counts: true,
             newest_first: true,
             auto_update: false,
+            backup_enabled: false,
+            backup_copies: default_backup_copies(),
         }
     }
 }
@@ -359,6 +378,8 @@ mod tests {
             show_tab_counts: true,
             newest_first: true,
             auto_update: false,
+            backup_enabled: true,
+            backup_copies: 7,
         })
         .unwrap();
         assert!(json.contains("\"showCompleted\":true"), "{json}");
@@ -370,17 +391,26 @@ mod tests {
         );
         assert!(json.contains("\"language\":\"en\""), "{json}");
         assert!(json.contains("\"autoUpdate\""), "{json}");
+        assert!(json.contains("\"backupCopies\":7"), "{json}");
+        assert!(json.contains("\"backupEnabled\":true"), "{json}");
         let parsed: AppSettings = serde_json::from_str(&json).unwrap();
         assert!(parsed.show_completed);
         assert!(!parsed.cascade_complete);
         assert_eq!(parsed.auto_delete_days, Some(30));
         assert_eq!(parsed.trash_limit, 50);
         assert_eq!(parsed.language, "en");
+        assert!(parsed.backup_enabled);
+        assert_eq!(parsed.backup_copies, 7);
         // An export made before the toggle existed must still parse: the
         // default is off, not an error.
         let legacy = r#"{"theme":"dark","showCompleted":true,"cascadeComplete":false,"autoDeleteDays":null,"trashLimit":50,"trashRetentionDays":null,"language":"en","expandSubtasks":true,"showTabCounts":true,"newestFirst":true}"#;
         let parsed: AppSettings = serde_json::from_str(legacy).unwrap();
         assert!(!parsed.auto_update);
+        assert_eq!(
+            parsed.backup_copies,
+            crate::db::repository::DEFAULT_BACKUP_COPIES
+        );
+        assert!(!parsed.backup_enabled);
     }
 
     #[test]

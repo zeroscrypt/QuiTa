@@ -1,5 +1,5 @@
 import * as dbService from '$services/dbService';
-import type { DbStats } from '$services/dbService';
+import type { BackupFile, DbStats } from '$services/dbService';
 
 class DbStore {
   stats = $state<DbStats | null>(null);
@@ -7,16 +7,50 @@ class DbStore {
   busy = $state(false);
   error = $state<string | null>(null);
   lastVacuumSaved = $state<number | null>(null);
+  /** Stored copies, newest first. */
+  backups = $state<BackupFile[]>([]);
+  backupBusy = $state(false);
+  backupError = $state<string | null>(null);
+  /** Flips after a copy lands, cleared at the start of the next one. */
+  backupDone = $state(false);
 
   async refresh(): Promise<void> {
     this.loading = true;
     try {
-      this.stats = await dbService.getDbStats();
+      const [stats, info] = await Promise.all([
+        dbService.getDbStats(),
+        // A listing that fails must not blank the database statistics over
+        // it: the copy folder is disposable, the numbers are not.
+        dbService.backupInfo().catch(() => null),
+      ]);
+      this.stats = stats;
+      if (info) this.backups = info.files;
       this.error = null;
     } catch (e) {
       this.error = e instanceof Error ? e.message : String(e);
     } finally {
       this.loading = false;
+    }
+  }
+
+  /**
+   * Takes a copy right now and brings the listing back after the rotation.
+   * A manual copy works with the feature switched off: the store is in the
+   * settings, the button does what it says.
+   */
+  async backup(): Promise<void> {
+    if (this.backupBusy) return;
+    this.backupBusy = true;
+    this.backupDone = false;
+    try {
+      const info = await dbService.runBackup();
+      this.backups = info.files;
+      this.backupError = null;
+      this.backupDone = true;
+    } catch (e) {
+      this.backupError = e instanceof Error ? e.message : String(e);
+    } finally {
+      this.backupBusy = false;
     }
   }
 

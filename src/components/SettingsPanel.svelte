@@ -530,6 +530,67 @@
 
         <section class="settings-section">
           <h3 class="settings-label">
+            {t('db.backups')}
+            <InfoHint text={t('db.backupHint')} />
+          </h3>
+          <label class="toggle-row">
+            <span class="toggle-label">{t('db.backupAuto')}</span>
+            <button
+              class="switch"
+              role="switch"
+              aria-checked={settingsStore.backupEnabled}
+              aria-label={t('db.backupAuto')}
+              onclick={() => void settingsStore.setBackupEnabled(!settingsStore.backupEnabled)}
+            >
+              <span class="switch-thumb"></span>
+            </button>
+          </label>
+          <p class="settings-hint">{t('db.backupAutoHint')}</p>
+
+          <div class="days-row">
+            <input
+              class="days-input"
+              type="number"
+              min="1"
+              max="30"
+              value={settingsStore.backupCopies}
+              aria-label={t('db.backupCopies')}
+              onchange={(e) => {
+                const value = Number((e.currentTarget as HTMLInputElement).value.trim());
+                if (Number.isInteger(value) && value >= 1 && value <= 30) {
+                  void settingsStore.setBackupCopies(value);
+                }
+              }}
+            />
+            <span class="days-suffix">
+              {settingsStore.language === 'en' ? 'files' : 'шт.'}
+            </span>
+          </div>
+
+          <button
+            class="button secondary wide"
+            disabled={dbStore.backupBusy}
+            onclick={() => void dbStore.backup()}
+          >
+            {dbStore.backupBusy ? t('db.backupRunning') : t('db.backupNow')}
+          </button>
+          {#if dbStore.backupDone}
+            <p class="settings-hint success">{t('db.backupDone')}</p>
+          {/if}
+          {#if dbStore.backupError}
+            <p class="settings-hint error" role="alert">{dbStore.backupError}</p>
+          {/if}
+          <p class="settings-hint">
+            {dbStore.backups.length > 0
+              ? t('db.backupLast')
+                  .replace('{time}', dbStore.backups[0].createdAt)
+                  .replace('{count}', String(dbStore.backups.length))
+              : t('db.backupNone')}
+          </p>
+        </section>
+
+        <section class="settings-section">
+          <h3 class="settings-label">
             {t('db.howItWorks')}
             <InfoHint text={t('db.hintStorage')} />
           </h3>

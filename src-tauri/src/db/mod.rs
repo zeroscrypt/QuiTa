@@ -1,3 +1,4 @@
+pub mod backup;
 pub mod migrations;
 pub mod repository;
 
@@ -33,6 +34,14 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Er
     // Every install needs at least one tab, and tasks created before tabs
     // existed are attached to the first one.
     repository::ensure_default_tab(&conn)?;
+
+    // The copies live next to the file they mirror. The launch copy runs
+    // here, where the connection and the directory are both at hand; the
+    // commands pick the same folder from managed state.
+    let backups = backup::backups_dir(&data_dir);
+    app.manage(backup::BackupDir(backups.clone()));
+    let settings = repository::get_settings(&conn)?;
+    backup::auto_backup(&conn, &backups, &settings);
 
     app.manage(Db(Mutex::new(conn)));
     Ok(())
