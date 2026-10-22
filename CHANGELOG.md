@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/zeroscrypt/QuiTa/compare/v1.7.0...v1.7.1) (2026-10-22)
+
+
+### Исправлено
+
+* **настройки:** вкладки не переносят подписи ([#48](https://github.com/zeroscrypt/QuiTa/issues/48)) ([5ab413d](https://github.com/zeroscrypt/QuiTa/commit/5ab413d1f545ba576088ceec051df035bbaf13bc))
+
 ## [1.7.0](https://github.com/zeroscrypt/QuiTa/compare/v1.6.1...v1.7.0) (2026-10-22)
 
 
