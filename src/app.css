@@ -221,9 +221,7 @@ input {
   align-items: center;
   gap: 8px;
   width: 100%;
-  /* Narrow vertically on purpose: a menu item is a row, not a toolbar button.
-     Tall paddings made the task menu look like a pile of tiles. */
-  padding: 4px 10px;
+  padding: 7px 10px;
   border-radius: 7px;
   font-size: 13px;
   text-align: left;
@@ -246,5 +244,5 @@ input {
 .menu-separator {
   height: 1px;
   background: var(--border);
-  margin: 3px 6px;
+  margin: 4px 6px;
 }
