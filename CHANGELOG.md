@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/zeroscrypt/QuiTa/compare/v1.9.0...v1.10.0) (2026-10-22)
+
+
+### Новое
+
+* **сроки:** естественно-языковые даты в названии задачи ([#54](https://github.com/zeroscrypt/QuiTa/issues/54)) ([19f62de](https://github.com/zeroscrypt/QuiTa/commit/19f62de0da4bcb334aac6dd5bfa3ea3d59f73910))
+
 ## [1.9.0](https://github.com/zeroscrypt/QuiTa/compare/v1.8.0...v1.9.0) (2026-10-22)
 
 
