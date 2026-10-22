@@ -4,7 +4,7 @@ import type { SearchResult, Task, TaskId, TaskNode } from '$lib/types';
 import * as taskService from '$services/taskService';
 import * as tabService from '$services/tabService';
 import { t } from '$i18n';
-import { truncate } from '$domain/taskRules';
+import { truncate, isClosed } from '$domain/taskRules';
 import { settingsStore } from './settingsStore.svelte';
 import { tabStore } from './tabStore.svelte';
 import { uiStore } from './uiStore.svelte';
@@ -30,6 +30,13 @@ class TaskStore {
   expanded = $state<ReadonlySet<string>>(new Set<string>());
   /** Explicitly closed tasks, used while "always expand" is on. */
   collapsed = $state<ReadonlySet<string>>(new Set<string>());
+  /**
+   * The task the keyboard works on: the last row the user pressed, any
+   * pointer button. ⌘D/Ctrl+D marks it "не актуальная" without another click,
+   * so the mark has to stay a one-gesture promise — hence the state lives
+   * here, not inside a component where it would die with the row.
+   */
+  selectedTaskId = $state<TaskId | null>(null);
   deleted = $state<Task[]>([]);
   /**
    * How many tasks are in the trash in total, which is not the same as how many
@@ -115,6 +122,9 @@ class TaskStore {
     } finally {
       this.loading = false;
     }
+    // The list being replaced may belong to another tab; a selection that
+    // points outside it would let the hotkey mark a row nobody can see.
+    this.selectedTaskId = null;
   }
 
   async reload(): Promise<void> {
@@ -246,7 +256,7 @@ class TaskStore {
 
       if (missingRoots.length > 0) {
         for (const task of missingRoots) {
-          if (task.deletedAt === null && (settingsStore.showCompleted || task.completedAt === null)) {
+          if (task.deletedAt === null && (settingsStore.showCompleted || !isClosed(task))) {
             let children: Task[] = [];
             try {
               children = await taskService.listSubtasks(task.id);
@@ -268,6 +278,55 @@ class TaskStore {
       this.showError(e);
       await this.load();
     }
+  }
+
+  /**
+   * Flips the "не актуальная" mark, mirroring `toggle` in every way but the
+   * backend call: same in-place update, same handling of rows that re-enter
+   * the list, same badge refresh. The mark cascades inside the backend, so
+   * the outcome — not the request — carries what changed.
+   */
+  async toggleNotRelevant(id: TaskId): Promise<void> {
+    try {
+      const outcome = await taskService.toggleTaskNotRelevance(id);
+
+      const known = new Set<string>();
+      for (const node of this.nodes) {
+        known.add(node.task.id);
+        for (const child of node.children) known.add(child.id);
+      }
+      const missingRoots = outcome.updated.filter(
+        (t) => t.parentId === null && !known.has(t.id),
+      );
+
+      this.applyUpdated(outcome.updated);
+
+      if (missingRoots.length > 0) {
+        for (const task of missingRoots) {
+          if (task.deletedAt === null && (settingsStore.showCompleted || !isClosed(task))) {
+            let children: Task[] = [];
+            try {
+              children = await taskService.listSubtasks(task.id);
+            } catch {
+              children = [];
+            }
+            this.nodes = [...this.nodes, { task, children }].sort(
+              (a, b) => a.task.sortOrder - b.task.sortOrder,
+            );
+          }
+        }
+      }
+      // The tab's done/total badge counts the mark as closure.
+      this.touchTabCounts();
+    } catch (e) {
+      this.showError(e);
+      await this.load();
+    }
+  }
+
+  /** Records the last pressed row: the target ⌘D/Ctrl+D works on. */
+  select(id: TaskId): void {
+    this.selectedTaskId = id;
   }
 
   async setDueDate(id: TaskId, dueDate: string | null): Promise<void> {
@@ -314,6 +373,11 @@ class TaskStore {
       this.expanded = expanded;
       this.collapsed = collapsed;
       this.touchTabCounts();
+      // A removed row cannot stay the keyboard's target: the hotkey would try
+      // to mark a task that is already in the bin.
+      if (this.selectedTaskId !== null && ids.has(this.selectedTaskId)) {
+        this.selectedTaskId = null;
+      }
       if (outcome.evicted.length > 0) {
         this.announceEviction(outcome.evicted);
       }

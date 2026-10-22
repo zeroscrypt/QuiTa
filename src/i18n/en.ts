@@ -36,6 +36,8 @@ export const en: Record<string, string> = {
   "tab.dragHint": "Drag to reorder tabs",
   "task.autoDelete": "Delete completed after N days",
   "task.autoDeleteOn": "Auto-delete: {days} d",
+  "task.markNotRelevant": "Not relevant",
+  "task.markRelevant": "Relevant again",
 
   "due.label": "Due date",
   "due.overdue": "Due date passed",
@@ -234,6 +236,8 @@ export const en: Record<string, string> = {
   "shortcuts.newTab": "new tab — opens the name field, like the \"+\" button",
   "shortcuts.search": "caret into the search field",
   "shortcuts.settings": "these settings",
+  "shortcuts.markNotRelevant":
+    "mark the last-pressed task as not relevant, or back again: red, dimmed, a cross in the checkbox; counts as closed",
   "shortcuts.create": "create the task in the input field",
   "shortcuts.closeLayer": "close the topmost open layer, one per press",
 

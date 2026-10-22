@@ -29,6 +29,7 @@ describe('shortcutRows', () => {
       'shortcuts.newTab',
       'shortcuts.search',
       'shortcuts.settings',
+      'shortcuts.markNotRelevant',
       'shortcuts.create',
       'shortcuts.closeLayer',
     ]);
@@ -48,6 +49,7 @@ describe('shortcutRows', () => {
     expect(mac.find((r) => r.labelKey === 'shortcuts.newTab')?.keys).toEqual(['⌘', 'T']);
     expect(mac.find((r) => r.labelKey === 'shortcuts.search')?.keys).toEqual(['⌘', 'F']);
     expect(mac.find((r) => r.labelKey === 'shortcuts.settings')?.keys).toEqual(['⌘', 'S']);
+    expect(mac.find((r) => r.labelKey === 'shortcuts.markNotRelevant')?.keys).toEqual(['⌘', 'D']);
     expect(mac.find((r) => r.labelKey === 'shortcuts.switchTab')?.keys).toEqual(['⌘', '1…9']);
     // Enter and Esc have no modifier, on any platform.
     expect(mac.find((r) => r.labelKey === 'shortcuts.create')?.keys).toEqual(['Enter']);

@@ -148,6 +148,22 @@ input {
   opacity: 1;
 }
 
+/* Не актуальная: red cross. On an open box the cross is red itself; on a
+   closed-and-marked task the box fills red and the cross goes white, so a
+   task closed in both senses reads as closed once, red. */
+.checkbox.not-relevant svg {
+  opacity: 1;
+}
+
+.checkbox.not-relevant {
+  border-color: var(--danger);
+}
+
+.checkbox[aria-checked='true'].not-relevant {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

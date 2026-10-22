@@ -13,7 +13,7 @@ function event(overrides: Partial<KeyboardEvent> = {}) {
 }
 
 describe('appShortcut', () => {
-  it('reads the three bindings with either modifier', () => {
+  it('reads the four bindings with either modifier', () => {
     // ⌘ on macOS, Ctrl on Windows and Linux: both accepted everywhere, so the
     // app needs no platform detection to be predictable.
     for (const modifier of ['metaKey', 'ctrlKey'] as const) {
@@ -21,6 +21,7 @@ describe('appShortcut', () => {
       expect(appShortcut(event({ ...meta, key: 't' }))).toBe('newTab');
       expect(appShortcut(event({ ...meta, key: 'f' }))).toBe('focusSearch');
       expect(appShortcut(event({ ...meta, key: 's' }))).toBe('settings');
+      expect(appShortcut(event({ ...meta, key: 'd' }))).toBe('markNotRelevant');
     }
   });
 
@@ -29,6 +30,7 @@ describe('appShortcut', () => {
     expect(appShortcut(event({ key: 't' }))).toBeNull();
     expect(appShortcut(event({ key: 'f' }))).toBeNull();
     expect(appShortcut(event({ key: 's' }))).toBeNull();
+    expect(appShortcut(event({ key: 'd' }))).toBeNull();
   });
 
   it('leaves Alt and Shift alone', () => {

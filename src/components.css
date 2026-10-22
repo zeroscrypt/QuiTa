@@ -182,6 +182,20 @@
   background: transparent;
 }
 
+/* Не актуальная: работа снята с повестки, не "сделано". Красный, но
+   приглушённый — иначе просроченный и помеченный выглядели бы одинаково,
+   а один говорит "уже поздно", другой "уже не нужно". Вычёркивание не
+   применяем: оно читается как выполнено. Тускнеть должна вся строка. */
+.task-row.not-relevant {
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
+  opacity: 0.75;
+}
+
+.task-row.not-relevant .task-title,
+.task-row.not-relevant .task-title.overdue {
+  color: color-mix(in srgb, var(--danger) 78%, var(--text-disabled));
+}
+
 .task-actions {
   display: flex;
   align-items: center;

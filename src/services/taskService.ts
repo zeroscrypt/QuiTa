@@ -30,6 +30,14 @@ export function toggleTaskCompletion(
   return invoke<ToggleOutcome>('toggle_task_completion', { id, cascadeComplete: cascade });
 }
 
+/**
+ * Flips the "не актуальная" mark. The backend mirrors the completion cascade
+ * on its own, so the UI only needs the id — no per-call settings.
+ */
+export function toggleTaskNotRelevance(id: TaskId): Promise<ToggleOutcome> {
+  return invoke<ToggleOutcome>('toggle_task_not_relevance', { id });
+}
+
 export function setTaskDueDate(id: TaskId, dueDate: string | null): Promise<Task> {
   return invoke<Task>('set_task_due_date', { id, dueDate });
 }

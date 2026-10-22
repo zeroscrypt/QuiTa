@@ -54,6 +54,15 @@ pub async fn toggle_task_completion(
 }
 
 #[tauri::command]
+pub async fn toggle_task_not_relevance(
+    id: TaskId,
+    db: State<'_, Db>,
+) -> Result<ToggleOutcome, TaskError> {
+    let mut conn = db.lock().map_err(TaskError::Internal)?;
+    repository::toggle_not_relevance(&mut conn, &id)
+}
+
+#[tauri::command]
 pub async fn set_task_due_date(
     id: TaskId,
     due_date: Option<String>,

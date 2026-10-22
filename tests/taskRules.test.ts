@@ -4,7 +4,10 @@ import {
   canHaveSubtasks,
   formatProgress,
   getSubtaskStats,
+  isClosed,
+  isNotRelevant,
   isOverdue,
+  isPartiallyDone,
 } from '../src/domain/taskRules';
 import type { Task, TaskNode } from '../src/lib/types';
 
@@ -23,6 +26,9 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     sortOrder: 0,
     completionEventId: null,
     autoCompletedBy: null,
+    notRelevantAt: null,
+    notRelevantEventId: null,
+    autoNotRelevantBy: null,
     ...overrides,
   };
 }
@@ -98,5 +104,57 @@ describe('canHaveSubtasks', () => {
     expect(
       canHaveSubtasks(makeTask({ completedAt: '2026-01-02T00:00:00Z' })),
     ).toBe(true);
+  });
+});
+
+describe('не актуальная', () => {
+  const marked = '2026-01-02T00:00:00Z';
+
+  it('reads the mark and the two closures as one closed state', () => {
+    // The user asked for the mark to behave "как у закрытой": both predicates
+    // must answer the same question without the caller picking columns.
+    const plain = makeTask();
+    expect(isNotRelevant(plain)).toBe(false);
+    expect(isClosed(plain)).toBe(false);
+
+    const flagged = makeTask({ notRelevantAt: marked });
+    expect(isNotRelevant(flagged)).toBe(true);
+    expect(isClosed(flagged)).toBe(true);
+
+    const done = makeTask({ completedAt: marked });
+    expect(isClosed(done)).toBe(true);
+
+    // Closed in both senses is still one closure, not a double one.
+    const both = makeTask({ completedAt: marked, notRelevantAt: marked });
+    expect(isClosed(both)).toBe(true);
+  });
+
+  it('counts marked subtasks in the stats, like closed ones', () => {
+    const children = [
+      makeTask({ id: '1', completedAt: marked }),
+      makeTask({ id: '2', notRelevantAt: marked }),
+      makeTask({ id: '3' }),
+    ];
+    expect(getSubtaskStats(children)).toEqual({ total: 3, done: 2 });
+  });
+
+  it('keeps the progress badge honest for a marked parent', () => {
+    // The parent closes by either gesture; the badge arithmetic is the same.
+    expect(formatProgress({ total: 3, done: 2 }, true)).toBe('3/4');
+  });
+
+  it('a mark retires the work, so the parent is not "partially done"', () => {
+    // "Не актуальная" is a different gesture with the same consequence: below
+    // a converted parent there is no open work left to report.
+    const parent = makeTask({ completedAt: marked, notRelevantAt: marked });
+    const open = makeTask({ id: 'c1', parentId: 'id' });
+    const markedOpen = makeTask({ id: 'c2', parentId: 'id', notRelevantAt: marked });
+    expect(isPartiallyDone(parent, [open, markedOpen])).toBe(true);
+    expect(
+      isPartiallyDone(parent, [markedOpen, makeTask({ id: 'c3', parentId: 'id' })]),
+    ).toBe(true);
+    expect(
+      isPartiallyDone(makeTask({ notRelevantAt: marked }), [open]),
+    ).toBe(false);
   });
 });

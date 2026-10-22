@@ -130,6 +130,7 @@ Windows, `.AppImage` + `.deb` on Linux.
 
 - [x] **Tabs as projects** — create, rename by double click, reorder by drag, automatic colour from a 10-colour palette. Deleting a tab asks first and one click undoes it: the tab goes first, and its tasks wait out ten seconds before following it into the trash.
 - [x] **Subtasks** — exactly one level deep, and that is the limit.
+- [x] **Not relevant** — retire a task without deleting it: a red, dimmed row with a cross, closed status in every list. A menu item plus `Cmd+D`/`Ctrl+D` on the last-pressed task.
 - [x] **Due dates** — calendar dates with no timezone shift, overdue tasks highlighted, chips for today / tomorrow.
 - [x] **Comments** — autosaved, opened from the button next to a task.
 - [x] **Storm entry** — the field never closes after `Enter`, the caret stays put.
@@ -203,6 +204,7 @@ immediately.
 | `Cmd+T` / `Ctrl+T` | a new tab — opens the same name field as the "+" button |
 | `Cmd+F` / `Ctrl+F` | caret into the search field |
 | `Cmd+S` / `Ctrl+S` | settings |
+| `Cmd+D` / `Ctrl+D` | mark the last-pressed task "not relevant": red, dimmed, a cross in the checkbox; counts as closed |
 | `Cmd+1`…`Cmd+9` / `Ctrl+1`…`Ctrl+9` | switching tabs (above) |
 
 All three take the same modifier as the digits, and hand the keyboard to an
@@ -315,8 +317,8 @@ therefore testable without a window.
 | `pnpm tauri dev` | Run with hot reload |
 | `pnpm tauri build` | Installers for the current platform |
 | `pnpm check` | Svelte and TypeScript types |
-| `pnpm test` | 170 unit tests |
-| `cargo test --manifest-path src-tauri/Cargo.toml` | 156 Rust tests (40 unit + 112 integration against a real database + 4 guarding the docs) |
+| `pnpm test` | 176 unit tests |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | 166 Rust tests (47 unit + 115 integration against a real database + 4 guarding the docs) |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets` | Lints, errors as warnings |
 | `cargo audit` | Vulnerabilities in dependencies |
 

@@ -13,7 +13,7 @@ export interface SubtaskStats {
 export function getSubtaskStats(children: Task[]): SubtaskStats {
   return {
     total: children.length,
-    done: children.filter((c) => c.completedAt !== null).length,
+    done: children.filter(isClosed).length,
   };
 }
 
@@ -22,10 +22,13 @@ export function getSubtaskStats(children: Task[]): SubtaskStats {
  *
  * The task itself counts as one: a task with three subtasks is four tasks, so
  * the badge reads "3/4", never "2/3".
+ *
+ * `taskClosed` is whether the parent itself counts as done — by hand or by
+ * the "не актуальная" mark. Both closures count the same way here.
  */
-export function formatProgress(stats: SubtaskStats, taskDone = false): string | null {
+export function formatProgress(stats: SubtaskStats, taskClosed = false): string | null {
   if (stats.total === 0) return null;
-  return `${stats.done + (taskDone ? 1 : 0)}/${stats.total + 1}`;
+  return `${stats.done + (taskClosed ? 1 : 0)}/${stats.total + 1}`;
 }
 
 /**
@@ -33,10 +36,14 @@ export function formatProgress(stats: SubtaskStats, taskDone = false): string | 
  *
  * This is a normal state (the parent is finished, the remaining work lives
  * below it), so it gets its own look instead of looking plain completed.
+ *
+ * A subtask counts as open unless it is closed in either sense — completed
+ * or marked "не актуальная". The mark retires the work, it does not leave
+ * a "partially done" row behind.
  */
 export function isPartiallyDone(task: Task, children: Task[]): boolean {
   if (task.completedAt === null) return false;
-  return children.some((child) => child.completedAt === null);
+  return children.some((child) => !isClosed(child));
 }
 
 /** A task is overdue when its calendar date is before today (local time). */
@@ -65,6 +72,21 @@ export function canHaveSubtasks(task: Task): boolean {
 
 export function isCompleted(task: Task): boolean {
   return task.completedAt !== null;
+}
+
+/** Marked "не актуальная": kept on purpose, but the work is retired. */
+export function isNotRelevant(task: Task): boolean {
+  return task.notRelevantAt !== null;
+}
+
+/**
+ * Closed in either sense — completed by hand or retired as irrelevant.
+ *
+ * Every list, counter and the cleanup timer treat the two the same way
+ * (docs/TASK_RULES.md), so they share this predicate.
+ */
+export function isClosed(task: Task): boolean {
+  return isCompleted(task) || isNotRelevant(task);
 }
 
 /** Truncates titles for compact menus/tooltips. */

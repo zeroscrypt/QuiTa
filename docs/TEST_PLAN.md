@@ -12,10 +12,10 @@
 
 | Набор | Команда | Тестов |
 |-------|---------|--------|
-| Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 40 |
-| Rust integration | то же | 112 |
+| Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 47 |
+| Rust integration | то же | 115 |
 | Rust документация | то же (`tests/documentation.rs`) | 4 |
-| TypeScript | `pnpm test` | 170 |
+| TypeScript | `pnpm test` | 176 |
 
 Числа берутся из фактического прогона. Если они разошлись с таблицей —
 значит, тесты забыли пересчитать, и это такое же расхождение кода и
@@ -48,6 +48,13 @@
 | `reopening_subtask_leaves_the_completed_parent_closed` | Снятие галочки с подзадачи не открывает закрытого родителя |
 | `toggling_a_subtask_never_touches_the_parent_in_either_direction` | Ни завершение, ни открытие подзадачи не трогают родителя |
 | `cascade_disabled_leaves_children_untouched` | Без каскада галочка родителя меняет только его самого |
+| `marking_parent_auto_marks_children_under_one_event` | Пометка родителя помечает непомеченных детей под одним event_id |
+| `marking_parent_leaves_hand_marked_children_out_of_the_event` | Ручные пометки не попадают под событие; завершённые дети помечаются, не теряя завершения |
+| `marking_parent_records_no_event_when_every_child_is_already_marked` | Нечего помечать — нечего и отменять: event_id не записывается |
+| `unmarking_parent_unmarks_only_its_own_event_marks` | Снятие пометки отменяет ровно пометки своего события |
+| `unmarking_without_event_undo_nothing_beyond_the_parent` | Пометка без события не имеет реестра отмены: поздние пометки детей остаются |
+| `marking_a_subtask_plans_nothing_beyond_that_one_task` | Пометка подзадачи — только строка самой подзадачи, без события |
+| `the_completion_plan_ignores_the_not_relevant_mark` | Два закрытия — два независимых факта: домен завершения не читает пометку |
 | `cascade_disabled_mean_reopening_restores_nothing` | Без каскада открытие родителя не восстанавливает подзадачи |
 
 ## Интеграционные тесты Rust
@@ -74,6 +81,14 @@
 | `completing_child_keeps_parent_open_and_is_recorded_as_manual` | Ручное завершение подзадачи не трогает родителя и не помечается как авто-завершение |
 | `completed_parent_can_receive_new_subtasks` | Завершённый родитель подзадачи принимает — строка читается как «частично выполнено» |
 | `cascade_disabled_completes_only_the_parent` | Без каскада подзадачи остаются как были |
+
+### Статус «Не актуальная»
+
+| Тест | Что проверяет |
+|------|---------------|
+| `marking_not_relevant_hides_the_task_and_counts_it_as_done` | Пометка скрыта без «показывать выполненные», видна с ними, считается закрытой в счётчике вкладки и невидима поиску |
+| `marking_a_parent_cascades_and_unmarking_restores_only_auto_marks` | Пометка родителя каскадом помечает детей (завершение не трогается), снятие возвращает ровно автоматические |
+| `the_completion_timer_sweeps_marked_tasks_the_same_way` | Таймер завершённых уносит помеченную семью после срока, как завершённую |
 
 ### Удаление и восстановление
 
@@ -156,7 +171,7 @@
 
 ## Тесты TypeScript (vitest)
 
-Девятнадцать файлов, 141 тест. Ниже перечислены все наборы.
+Двадцать три файла, 176 тестов. Ниже перечислены все наборы.
 
 ### `tests/taskValidation.test.ts`
 
@@ -197,6 +212,10 @@
 | `canHaveSubtasks` — allows active root tasks | Активные корневые задачи |
 | `canHaveSubtasks` — forbids subtasks (only one level) | Запрет второго уровня |
 | `canHaveSubtasks` — allows completed roots to receive more subtasks | Завершённый родитель подзадачи принимает |
+| «не актуальная» — reads the mark and the two closures as one closed state | Пометка и завершение дают один статус «закрыто» |
+| «не актуальная» — counts marked subtasks in the stats, like closed ones | Пометка считается в статистике подзадач |
+| «не актуальная» — keeps the progress badge honest for a marked parent | Прогресс считает закрытие любым путём |
+| «не актуальная» — a mark retires the work, so the parent is not "partially done" | Пометка убирает работу из «частично выполнено» |
 
 ### `tests/taskItem.test.ts`
 
@@ -207,6 +226,8 @@ SSR-рендер компонента задачи — проверяет кон
 | `renders an open task as unchecked` | `aria-checked="false"`, нет класса `completed` |
 | `renders a completed task as checked` | Завершённая задача отмечена |
 | `marks an overdue task and shows its calendar date` | Подсветка просрочки и дата в формате YYYY-MM-DD |
+| `renders a marked task red and dim, and does not call it checked` | «Не актуальная»: красная строка с крестиком, без галочки и зачёркивания |
+| `keeps the red cross on a task closed in both senses` | Завершённая и помеченная задача выглядит красной, а не серой |
 | `offers subtask creation for roots and counts the parent in progress` | Прогресс и кнопка подзадачи у корневой задачи |
 | `marks a completed task with open subtasks as partially done` | Состояние «частично выполнено» |
 | `does not offer subtasks, reordering or nested add for subtasks` | У подзадачи нет кнопки подзадач и переупорядочивания |
@@ -289,7 +310,7 @@ SSR-рендер компонента задачи — проверяет кон
 
 | Тест | Что проверяет |
 |------|---------------|
-| `reads the three bindings with either modifier` | ⌘ и Ctrl на всех платформах дают одно и то же |
+| `reads the four bindings with either modifier` | ⌘ и Ctrl на всех платформах дают одно и то же |
 | `ignores the letters without a modifier` | Буква в названии задачи не создаёт вкладку |
 | `leaves Alt and Shift alone` | ⌥⌘T и ⌘⇧F не перехватываются |
 | `does not claim the digits or anything else` | Цифры остаются за полосой вкладок |
@@ -311,7 +332,7 @@ SSR-рендер компонента задачи — проверяет кон
 |------|---------------|
 | `spells the command key the way the keyboard in front of the user does` | ⌘ на macOS, Ctrl на остальных |
 | `falls back to Ctrl when the platform is not known yet` | До первого ответа бэкенда список не врёт про клавиатуру |
-| `lists every shortcut the app answers to` | Семь сочетаний, ни одного пропущенного |
+| `lists every shortcut the app answers to` | Восемь сочетаний, ни одного пропущенного |
 | `puts the global shortcut first, spelled by the backend` | Глобальное сочетание приходит из Rust, а не из разметки |
 | `uses the platform modifier for the window keys and none for the rest` | Модификатор у нужных строк и его отсутствие у `Enter`/`Esc` |
 | `drops the global row when the backend has not answered yet` | Пустая строка не превращается в одинокий «+» |

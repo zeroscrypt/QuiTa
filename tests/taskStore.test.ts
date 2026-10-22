@@ -25,6 +25,9 @@ function makeTask(overrides: Record<string, unknown> = {}) {
     sortOrder: -1,
     completionEventId: null,
     autoCompletedBy: null,
+    notRelevantAt: null,
+    notRelevantEventId: null,
+    autoNotRelevantBy: null,
     ...overrides,
   };
 }

@@ -20,7 +20,9 @@
     canHaveSubtasks,
     formatProgress,
     getSubtaskStats,
+    isClosed,
     isCompleted,
+    isNotRelevant,
     isOverdue,
     isPartiallyDone,
   } from '$domain/taskRules';
@@ -94,10 +96,11 @@
   }
 
   const stats = $derived(getSubtaskStats(children));
-  const progress = $derived(formatProgress(stats, isCompleted(task)));
+  const progress = $derived(formatProgress(stats, isClosed(task)));
   const partial = $derived(isPartiallyDone(task, children));
   const expanded = $derived(taskStore.isExpanded(task.id));
   const overdue = $derived(isOverdue(task));
+  const notRelevant = $derived(isNotRelevant(task));
   const isSubtask = $derived(task.parentId !== null);
   const canAddSubtasks = $derived(!isSubtask && canHaveSubtasks(task));
   // Only active root tasks may adopt dragged tasks as subtasks.
@@ -105,11 +108,19 @@
   const isParentTarget = $derived(dragStore.hoverParentId === task.id);
 
   function onRowPointerDown(event: PointerEvent) {
+    // The last row pressed is the keyboard's target (⌘D marks it later). Any
+    // button counts: right press aims there too, since the menu it opens is
+    // about this very task.
+    taskStore.select(task.id);
     dragStore.begin(event, task);
   }
 
   function toggle() {
     void taskStore.toggle(task.id);
+  }
+
+  function toggleNotRelevant() {
+    void taskStore.toggleNotRelevant(task.id);
   }
 
   function startEdit() {
@@ -196,10 +207,20 @@
     return () => document.removeEventListener('mousedown', onPointerDown);
   });
 
-  // The menu only holds actions without a one-click control in the row:
-  // renaming (double click), due date (calendar button), adding a subtask (+)
+  // The menu holds actions without a one-click control in the row: the
+  // "не актуальная" toggle, the auto-delete setting, reorder and delete.
+  // Renaming (double click), due date (calendar button), adding a subtask (+)
   // and expanding (chevron) are all reachable directly from the row.
   const menuItems: Item[] = $derived([
+    {
+      type: 'item' as const,
+      id: 'not-relevant',
+      // The mark is a toggle: the same item retires the task or puts it back
+      // on the agenda, whichever direction the row asks for.
+      label: notRelevant ? t('task.markRelevant') : t('task.markNotRelevant'),
+      onClick: toggleNotRelevant,
+    },
+    { type: 'separator' as const },
     {
       type: 'item',
       id: 'auto-delete',
@@ -239,9 +260,10 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="task-row"
-  class:completed={isCompleted(task) && !partial}
-  class:overdue={overdue && !isCompleted(task)}
-  class:partial
+  class:completed={isCompleted(task) && !partial && !notRelevant}
+  class:overdue={overdue && !isCompleted(task) && !notRelevant}
+  class:not-relevant={notRelevant}
+  class:partial={partial && !notRelevant}
   class:drop-hover={isParentTarget}
   class:drop-armed={isParentTarget && dragStore.nesting}
   class:dragging={dragStore.active && dragStore.sourceId === task.id}
@@ -268,6 +290,7 @@
     <IconCheckbox
       checked={isCompleted(task)}
       partial={partial}
+      notRelevant={notRelevant}
       label={fill(
         isCompleted(task) ? t('task.reopen') : t('task.complete'),
         'title',
