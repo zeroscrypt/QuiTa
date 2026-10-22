@@ -8,20 +8,23 @@
   import { tabStore } from '$stores/tabStore.svelte';
   import { dbStore } from '$stores/dbStore.svelte';
   import { appStore } from '$stores/appStore.svelte';
+  import { updateStore } from '$stores/updateStore.svelte';
   import type { Task } from '$lib/types';
   import { t } from '$i18n';
   import { fill } from '$lib/text';
   import { trapFocus } from '$lib/focusTrap';
   import * as taskService from '$services/taskService';
   import InfoHint from './InfoHint.svelte';
+  import AboutBody from './AboutBody.svelte';
 
-  type TabId = 'interface' | 'tasks' | 'database' | 'trash';
+  type TabId = 'interface' | 'tasks' | 'database' | 'trash' | 'about';
 
   const TABS: { id: TabId; label: string }[] = [
     { id: 'interface', label: t('settings.tabInterface') },
     { id: 'tasks', label: t('settings.tabTasks') },
     { id: 'database', label: t('settings.tabDatabase') },
     { id: 'trash', label: t('settings.tabTrash') },
+    { id: 'about', label: t('settings.tabAbout') },
   ];
 
   let active = $state<TabId>('interface');
@@ -685,6 +688,49 @@
             {/each}
             <p class="settings-hint trash-note">{t('settings.trashNote')}</p>
           {/if}
+        </section>
+      {/if}
+
+      <!-- ======================== О программе ======================== -->
+      {#if active === 'about'}
+        <section class="settings-section">
+          <h3 class="settings-label">
+            {t('settings.tabAbout')}
+            <InfoHint text={t('settings.hintAbout')} />
+          </h3>
+          <AboutBody />
+        </section>
+
+        <section class="settings-section">
+          <h3 class="settings-label">
+            {t('settings.updates')}
+            <InfoHint text={t('settings.hintUpdates')} />
+          </h3>
+          <label class="toggle-row">
+            <span class="toggle-label">
+              {t('settings.autoUpdate')}
+              <InfoHint text={t('settings.hintAutoUpdate')} />
+            </span>
+            <button
+              class="switch"
+              role="switch"
+              aria-checked={settingsStore.autoUpdate}
+              aria-label={t('settings.autoUpdate')}
+              onclick={() => void settingsStore.setAutoUpdate(!settingsStore.autoUpdate)}
+            >
+              <span class="switch-thumb"></span>
+            </button>
+          </label>
+          <p class="settings-hint">
+            {settingsStore.autoUpdate ? t('settings.autoUpdateOn') : t('settings.autoUpdateOff')}
+          </p>
+          <button
+            class="button secondary wide"
+            disabled={updateStore.state === 'checking'}
+            onclick={() => void updateStore.check()}
+          >
+            {updateStore.state === 'checking' ? t('update.checking') : t('update.check')}
+          </button>
         </section>
       {/if}
     </div>

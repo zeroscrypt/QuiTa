@@ -332,6 +332,19 @@
   flex: none;
 }
 
+/* Пометка словом — тем же мелким шрифтом, что стоит на бейдже даты:
+   приглушённо-красный чип говорит «не актуальная» словами, а не только
+   крестиком в чекбоксе. Шрифт мелкий нарочно: подпись указывает статус,
+   а не заполняет строку. */
+.mark-badge {
+  font-size: 11.5px;
+  color: color-mix(in srgb, var(--danger) 78%, var(--text-disabled));
+  background: var(--danger-soft);
+  border-radius: 6px;
+  padding: 2px 7px;
+  flex: none;
+}
+
 /* ===== Drag & drop feedback ===== */
 
 .task-row {

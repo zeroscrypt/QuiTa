@@ -13,9 +13,9 @@
 | Набор | Команда | Тестов |
 |-------|---------|--------|
 | Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 47 |
-| Rust integration | то же | 115 |
+| Rust integration | то же | 116 |
 | Rust документация | то же (`tests/documentation.rs`) | 4 |
-| TypeScript | `pnpm test` | 176 |
+| TypeScript | `pnpm test` | 180 |
 
 Числа берутся из фактического прогона. Если они разошлись с таблицей —
 значит, тесты забыли пересчитать, и это такое же расхождение кода и
@@ -171,7 +171,7 @@
 
 ## Тесты TypeScript (vitest)
 
-Двадцать три файла, 176 тестов. Ниже перечислены все наборы.
+Двадцать пять файлов, 180 тестов. Ниже перечислены все наборы.
 
 ### `tests/taskValidation.test.ts`
 
@@ -226,7 +226,7 @@ SSR-рендер компонента задачи — проверяет кон
 | `renders an open task as unchecked` | `aria-checked="false"`, нет класса `completed` |
 | `renders a completed task as checked` | Завершённая задача отмечена |
 | `marks an overdue task and shows its calendar date` | Подсветка просрочки и дата в формате YYYY-MM-DD |
-| `renders a marked task red and dim, and does not call it checked` | «Не актуальная»: красная строка, белый крест на красной заливке, без галочки и зачёркивания |
+| `renders a marked task red and dim, and does not call it checked` | «Не актуальная»: красная строка, белый крест на красной заливке и подпись тем же мелким шрифтом, что и дата, без галочки и зачёркивания |
 | `keeps the red cross on a task closed in both senses` | Завершённая и помеченная задача выглядит красной, а не серой |
 | `offers subtask creation for roots and counts the parent in progress` | Прогресс и кнопка подзадачи у корневой задачи |
 | `marks a completed task with open subtasks as partially done` | Состояние «частично выполнено» |
@@ -380,6 +380,22 @@ SSR-рендер компонента задачи — проверяет кон
 | `is only "available" while a release is waiting` | Состояние доступного обновления |
 | `computes progress only when the total size is known` | Прогресс только при известном размере |
 | `forgets everything when dismissed` | Сброс после закрытия баннера |
+| `auto mode needs a release and the opt-in together` | Автоустановка включается и обновлением, и галочкой в настройках |
+
+### `tests/aboutBody.test.ts`
+
+Тело «О программе» — общее для диалога и вкладки настроек:
+
+| Тест | Что проверяет |
+|------|---------------|
+| `names the version even before the app info arrives` | Версия читается прочерком, пока данные не дошли; без обновлённой версии — полосы обновления нет |
+| `shows the found release with the install action` | Полоса с версией и кнопкой «Обновить», когда релиз найден |
+
+### `tests/aboutTab.test.ts`
+
+| Тест | Что проверяет |
+|------|---------------|
+| `lists the About tab among the settings tabs` | Вкладка «О программе» в полосе настроек |
 
 ### `tests/bumpVersion.test.ts`
 

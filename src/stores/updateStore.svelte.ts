@@ -1,7 +1,18 @@
 import { checkForUpdate, installUpdate, relaunch, type UpdateInfo } from '$services/updateService';
+import { settingsStore } from '$stores/settingsStore.svelte';
 import { t } from '$i18n';
 
 type State = 'idle' | 'checking' | 'available' | 'downloading' | 'error';
+
+/**
+ * The opt-in rule behind the settings toggle: auto mode turns a found release
+ * into the standard install flow with no click. A check that found nothing
+ * stays quiet either way, and with the toggle off the banner waits for the
+ * click, as it always has.
+ */
+export function shouldAutoUpdate(info: UpdateInfo | null, autoUpdate: boolean): boolean {
+  return info !== null && autoUpdate;
+}
 
 /**
  * In-app updates.
@@ -44,6 +55,10 @@ class UpdateStore {
     const info = await checkForUpdate();
     this.info = info;
     this.state = info ? 'available' : 'idle';
+    // Opt-in auto mode: the release installs itself. The store class is not a
+    // singleton in tests, so the reading goes through the real one — the
+    // launched app always has settings initialised before the first check.
+    if (shouldAutoUpdate(info, settingsStore.autoUpdate)) void this.update();
   }
 
   /** Downloads, installs and restarts. */

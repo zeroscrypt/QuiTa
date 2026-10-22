@@ -174,6 +174,11 @@ pub struct AppSettings {
     /// New root tasks are placed at the top of their tab when true, at the
     /// bottom when false.
     pub newest_first: bool,
+    /// When true, a newer release found at launch is downloaded, installed and
+    /// applied by an automatic restart — no click. Default false: updates
+    /// stay behind the banner until the user opts in.
+    #[serde(default)]
+    pub auto_update: bool,
 }
 
 impl Default for AppSettings {
@@ -189,6 +194,7 @@ impl Default for AppSettings {
             expand_subtasks: true,
             show_tab_counts: true,
             newest_first: true,
+            auto_update: false,
         }
     }
 }
@@ -352,6 +358,7 @@ mod tests {
             expand_subtasks: true,
             show_tab_counts: true,
             newest_first: true,
+            auto_update: false,
         })
         .unwrap();
         assert!(json.contains("\"showCompleted\":true"), "{json}");
@@ -362,12 +369,18 @@ mod tests {
             "the trash size rule crosses the bridge under this name: {json}"
         );
         assert!(json.contains("\"language\":\"en\""), "{json}");
+        assert!(json.contains("\"autoUpdate\""), "{json}");
         let parsed: AppSettings = serde_json::from_str(&json).unwrap();
         assert!(parsed.show_completed);
         assert!(!parsed.cascade_complete);
         assert_eq!(parsed.auto_delete_days, Some(30));
         assert_eq!(parsed.trash_limit, 50);
         assert_eq!(parsed.language, "en");
+        // An export made before the toggle existed must still parse: the
+        // default is off, not an error.
+        let legacy = r#"{"theme":"dark","showCompleted":true,"cascadeComplete":false,"autoDeleteDays":null,"trashLimit":50,"trashRetentionDays":null,"language":"en","expandSubtasks":true,"showTabCounts":true,"newestFirst":true}"#;
+        let parsed: AppSettings = serde_json::from_str(legacy).unwrap();
+        assert!(!parsed.auto_update);
     }
 
     #[test]

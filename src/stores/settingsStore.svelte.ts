@@ -10,6 +10,7 @@ class SettingsStore {
   expandSubtasks = $state(true);
   showTabCounts = $state(true);
   newestFirst = $state(true);
+  autoUpdate = $state(false);
   autoDeleteDays = $state<number | null>(null);
   trashLimit = $state(200);
   trashRetentionDays = $state<number | null>(null);
@@ -25,6 +26,7 @@ class SettingsStore {
       this.expandSubtasks = settings.expandSubtasks ?? true;
       this.showTabCounts = settings.showTabCounts ?? true;
       this.newestFirst = settings.newestFirst ?? true;
+      this.autoUpdate = settings.autoUpdate ?? false;
       this.autoDeleteDays = settings.autoDeleteDays ?? null;
       this.trashLimit = settings.trashLimit ?? 200;
       this.trashRetentionDays = settings.trashRetentionDays ?? null;
@@ -88,6 +90,12 @@ class SettingsStore {
     await this.persist();
   }
 
+  /** Opt-in: a found release installs itself instead of waiting in the banner. */
+  async setAutoUpdate(value: boolean): Promise<void> {
+    this.autoUpdate = value;
+    await this.persist();
+  }
+
   /**
    * `null` keeps what is in the trash until the user says otherwise. The default
    * is `null` on purpose: a deletion nobody asked for must not follow from a
@@ -121,6 +129,7 @@ class SettingsStore {
       expandSubtasks: this.expandSubtasks,
       showTabCounts: this.showTabCounts,
       newestFirst: this.newestFirst,
+      autoUpdate: this.autoUpdate,
       autoDeleteDays: this.autoDeleteDays,
       trashLimit: this.trashLimit,
       trashRetentionDays: this.trashRetentionDays,
