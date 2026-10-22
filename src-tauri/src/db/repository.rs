@@ -1804,6 +1804,13 @@ pub fn get_settings(conn: &Connection) -> Result<AppSettings, TaskError> {
             |row| row.get(0),
         )
         .optional()?;
+    let auto_update: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'auto_update'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
     Ok(AppSettings {
         theme: theme.unwrap_or_else(|| "system".to_string()),
         show_completed: show_completed.as_deref() == Some("1"),
@@ -1824,6 +1831,8 @@ pub fn get_settings(conn: &Connection) -> Result<AppSettings, TaskError> {
         show_tab_counts: show_tab_counts.as_deref() != Some("0"),
         // New tasks land on top unless the user reverses it.
         newest_first: newest_first.as_deref() != Some("0"),
+        // Updates stay behind the banner unless the user opted in.
+        auto_update: auto_update.as_deref() == Some("1"),
     })
 }
 
@@ -1895,6 +1904,11 @@ pub fn update_settings(
         "INSERT INTO settings (key, value) VALUES ('newest_first', ?1)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         [flag(settings.newest_first)],
+    )?;
+    tx.execute(
+        "INSERT INTO settings (key, value) VALUES ('auto_update', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [flag(settings.auto_update)],
     )?;
     tx.commit()?;
     get_settings(conn)

@@ -103,6 +103,21 @@ export const ru: Record<string, string> = {
   "settings.tabTasks": "Задачи",
   "settings.tabDatabase": "База",
   "settings.tabTrash": "Корзина",
+  "settings.tabAbout": "О программе",
+  "settings.updates": "Обновления",
+  "settings.hintAbout":
+    "Версия, автор, хранение и репозиторий. Проверка обновлений — на кнопке в разделе «Обновления».",
+  "settings.hintUpdates":
+    "Проверка проходит при каждом запуске; вручную — на кнопке ниже.",
+  "settings.hintAutoUpdate":
+    "Когда включено, найденное обновление устанавливается без кнопки «Обновить».",
+  "settings.autoUpdate": "Обновлять автоматически",
+  "settings.autoUpdateOn":
+    "Проверка при запуске; найденное скачивается и ставится само, приложение перезапустится.",
+  "settings.autoUpdateOff":
+    "Проверка при запуске; найденное предложит баннер — установить по кнопке.",
+  "settings.hintExpandSubtasks":
+    "Подзадачи показываются без ручного раскрытия; каждую можно сжать.",
   "settings.hintLanguage":
     "Язык интерфейса. Меняется сразу, включая окно «О программе».",
   "settings.hintTheme": "«Системная» следует за macOS/Windows и меняется сама.",

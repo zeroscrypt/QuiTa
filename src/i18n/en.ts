@@ -105,12 +105,27 @@ export const en: Record<string, string> = {
   "settings.tabTasks": "Tasks",
   "settings.tabDatabase": "Database",
   "settings.tabTrash": "Trash",
+  "settings.tabAbout": "About",
+  "settings.updates": "Updates",
+  "settings.hintAbout":
+    "Version, author, storage and the repository. Updates are checked with the button in the Updates section.",
+  "settings.hintUpdates":
+    "Checked at every launch; use the button below for a manual check.",
+  "settings.hintAutoUpdate":
+    "When on, a found update installs itself — no Update button press.",
+  "settings.autoUpdate": "Update automatically",
+  "settings.autoUpdateOn":
+    "Checked at launch; a found release downloads, installs and restarts the app on its own.",
+  "settings.autoUpdateOff":
+    "Checked at launch; a found release waits behind the banner until you press Update.",
   "settings.hintLanguage":
     "Interface language. Switches instantly, including the About box.",
   "settings.hintTheme":
     "“System” follows macOS/Windows and changes on its own.",
   "settings.hintShowCompleted":
     "Show completed tasks in the list. Hidden by default to keep it short.",
+  "settings.hintExpandSubtasks":
+    "Subtasks show without being expanded by hand; each can be collapsed.",
   "settings.hintCascade":
     "Whether completing a parent also completes its open subtasks. Reopening restores exactly those.",
   "settings.hintAutoDelete":

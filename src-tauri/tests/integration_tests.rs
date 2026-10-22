@@ -1039,6 +1039,26 @@ fn cascade_setting_round_trips_through_settings() {
 }
 
 #[test]
+fn auto_update_round_trips_and_defaults_off() {
+    let mut conn = open_test_db();
+    // Missing key: updates stay behind the banner. A default nobody set must
+    // not silently start downloading installers.
+    assert!(!repository::get_settings(&conn).unwrap().auto_update);
+
+    let settings = repository::get_settings(&conn).unwrap();
+    let updated = repository::update_settings(
+        &mut conn,
+        &AppSettings {
+            auto_update: true,
+            ..settings
+        },
+    )
+    .unwrap();
+    assert!(updated.auto_update);
+    assert!(repository::get_settings(&conn).unwrap().auto_update);
+}
+
+#[test]
 fn purge_moves_a_finished_tree_to_the_trash() {
     let mut conn = open_test_db();
     let root = repository::create_task(&mut conn, "Закрытая", None, None, true).unwrap();
@@ -2735,6 +2755,7 @@ fn export_carries_the_whole_state_and_import_reproduces_it() {
         trash_limit: repository::DEFAULT_TRASH_LIMIT,
         trash_retention_days: None,
         language: "en".to_string(),
+        auto_update: false,
     };
     repository::update_settings(&mut conn, &settings).unwrap();
     let _ = done;
@@ -2787,6 +2808,7 @@ fn importing_a_state_file_restores_tabs_hierarchy_and_settings() {
             trash_limit: repository::DEFAULT_TRASH_LIMIT,
             trash_retention_days: None,
             language: "en".to_string(),
+            auto_update: false,
         },
     )
     .unwrap();

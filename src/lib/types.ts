@@ -107,6 +107,11 @@ export interface AppSettings {
   showTabCounts: boolean;
   /** New root tasks go to the top of the tab; false puts them at the bottom. */
   newestFirst: boolean;
+  /**
+   * A newer release found at launch installs itself and restarts the app,
+   * no click (default: false — updates stay behind the banner).
+   */
+  autoUpdate: boolean;
 }
 
 export interface ToggleOutcome {

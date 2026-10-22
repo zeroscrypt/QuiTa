@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { updateStore } from '../src/stores/updateStore.svelte';
+import { updateStore, shouldAutoUpdate } from '../src/stores/updateStore.svelte';
 
 /**
  * The banner is the only part of the app that talks to the network. Two
@@ -55,5 +55,15 @@ describe('update banner state', () => {
     expect(store.state).toBe('idle');
     expect(store.info).toBeNull();
     expect(store.error).toBeNull();
+  });
+
+  it('auto mode needs a release and the opt-in together', () => {
+    const info = { version: '1.2.0', notes: '', date: '' };
+    // Nothing found: quiet, with or without the toggle.
+    expect(shouldAutoUpdate(null, true)).toBe(false);
+    // A release waits, but the toggle is off: the banner decides.
+    expect(shouldAutoUpdate(info, false)).toBe(false);
+    // The combination the toggle exists for.
+    expect(shouldAutoUpdate(info, true)).toBe(true);
   });
 });
