@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { localDateStringAfterDays } from "../src/domain/taskValidation";
 
 // Tauri APIs are unavailable outside the app shell; stores are imported for real
 // so that regressions like runes in a non-`.svelte.ts` module are caught here.
@@ -92,6 +93,47 @@ describe("taskStore", () => {
       tabId: null,
     });
     expect(taskStore.nodes[0].children).toHaveLength(1);
+  });
+
+  it("reads the deadline from the title and keeps only what the user wrote", async () => {
+    const { taskStore } = await import("../src/stores/taskStore.svelte");
+    const { tabStore } = await import("../src/stores/tabStore.svelte");
+    tabStore.tabs = [
+      {
+        id: "tab-1",
+        name: "Tab",
+        color: "#4c6fff",
+        sortOrder: 0,
+        createdAt: "",
+        updatedAt: "",
+        deletedAt: null,
+      },
+    ];
+    tabStore.activeTabId = "tab-1";
+    invoke.mockImplementation((command: string, args: { title?: string; dueDate?: string }) => {
+      if (command === "create_task") {
+        return Promise.resolve(makeTask({ title: args.title }));
+      }
+      if (command === "set_task_due_date") {
+        return Promise.resolve(makeTask({ title: args.title, dueDate: args.dueDate }));
+      }
+      return Promise.reject(new Error(`unexpected ${command}`));
+    });
+
+    await taskStore.addRoot("проверить диски за неделю");
+
+    // The phrase itself must not survive in the name: it became a date.
+    expect(invoke).toHaveBeenCalledWith("create_task", {
+      title: "проверить диски",
+      parentId: null,
+      tabId: "tab-1",
+    });
+    // A week from today, whatever the run date is.
+    expect(invoke).toHaveBeenCalledWith("set_task_due_date", {
+      id: "id-1",
+      dueDate: localDateStringAfterDays(7),
+    });
+    expect(taskStore.nodes[0].task.dueDate).toBe(localDateStringAfterDays(7));
   });
 
   it("removes the node after soft delete", async () => {

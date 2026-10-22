@@ -15,7 +15,7 @@
 | Rust unit | `cargo test --manifest-path src-tauri/Cargo.toml` | 49 |
 | Rust integration | то же | 118 |
 | Rust документация | то же (`tests/documentation.rs`) | 4 |
-| TypeScript | `pnpm test` | 183 |
+| TypeScript | `pnpm test` | 199 |
 
 Числа берутся из фактического прогона. Если они разошлись с таблицей —
 значит, тесты забыли пересчитать, и это такое же расхождение кода и
@@ -192,7 +192,7 @@
 
 ## Тесты TypeScript (vitest)
 
-Двадцать шесть файлов, 183 теста. Ниже перечислены все наборы.
+Двадцать семь файлов, 199 тестов. Ниже перечислены все наборы.
 
 ### `tests/taskValidation.test.ts`
 
@@ -263,6 +263,7 @@ SSR-рендер компонента задачи — проверяет кон
 |------|---------------|
 | `adds a new root task to the top of the list` | Вызов `create_task` и вставка наверх |
 | `adds a subtask to the matching parent` | Подзадача попадает к нужному родителю |
+| `reads the deadline from the title and keeps only what the user wrote` | «проверить диски за неделю» создаёт задачу «проверить диски» со сроком неделей от того же дня |
 | `removes the node after soft delete` | Узел исчезает после `soft_delete_task` |
 | `toggle applies the outcome in place instead of reloading the list` | Toggle применяет ответ бэкенда точечно |
 | `brings a reopened parent back into the list with its subtasks` | Открытый родитель возвращается в список вместе с подзадачами |
@@ -399,6 +400,28 @@ SSR-рендер компонента задачи — проверяет кон
 |------|---------------|
 | `backs up on demand and refreshes the listing with the rotation in it` | Кнопка «сейчас» проходит команду и приносит листинг уже после ротации |
 | `reports a failed copy without claiming success` | Провал копии виден в ошибке таба, а не в тишине успеха |
+
+### `tests/naturalDueDate.test.ts`
+
+Парсер естественно-языковых сроков в названии задачи:
+
+| Тест | Что проверяет |
+|------|---------------|
+| `turns «проверить диски за неделю» into a phone-a-week deadline` | Фраза пользователя превращается в сегодня+7, из заголовка уходит |
+| `understands сегодня, завтра and послезавтра` | Три фиксированных дня, «послезавтра» не двоится с «завтра» |
+| `works in english and keeps the english words out` | Вчерашние слова так же уходят из заголовка |
+| `does not fire on words that merely contain a date name` | «завтрак», «tomorrowland» — не даты |
+| `counts days, weeks, months and years, digits or words` | За/через/в течение N: дни, недели (×7), месяцы и годы сдвигают календарь |
+| `reads the english in-forms` | `in 3 days`, `in a week`, `in two weeks` |
+| `stays quiet away from за/через/в течение` | Голое «неделю», «пятницу» — слова, не сроки |
+| `picks the nearest weekday, today counts when it already is that day` | «в пт», «в пятницу», «в следующую пятницу» — ближайший день, сегодня включён, next — строго после |
+| `maps the english weekdays the same way` | `on friday`, `on fri`, `next monday` |
+| `reads dates without a year toward the future` | «31.10» — ближайший будущий день, прошедший катится на год |
+| `keeps explicit years as typed and refuses impossible dates` | «31.10.2027», «2026-12-01» — как написано; «31.02» — не дата |
+| `does not swallow version numbers` | «2.5.6» остаётся версией, дата не назначается |
+| `case does not matter, at any position of the phrase` | Регистр и место фразы в строке не важны |
+| `a phrase that was the whole title leaves no task behind` | Фраза-целиком не рождает даты: текст остаётся, как введён |
+| `cuts the leftmost phrase and keeps the rest readable` | Первая слева фраза забирается, остальное не трогается |
 
 ### `tests/updateStore.test.ts`
 
