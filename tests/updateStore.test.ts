@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { updateStore, shouldAutoUpdate } from '../src/stores/updateStore.svelte';
+import { updateStore, shouldAutoUpdate, isCheckDue } from '../src/stores/updateStore.svelte';
 
 /**
  * The banner is the only part of the app that talks to the network. Two
@@ -65,5 +65,14 @@ describe('update banner state', () => {
     expect(shouldAutoUpdate(info, false)).toBe(false);
     // The combination the toggle exists for.
     expect(shouldAutoUpdate(info, true)).toBe(true);
+  });
+
+  it('re-checks only after a full day of open window', () => {
+    const last = 1_760_000_000_000;
+    const hour = 60 * 60 * 1000;
+    // Twenty-three hours are not a day: the app stays quiet.
+    expect(isCheckDue(last, last + 23 * hour)).toBe(false);
+    // Exactly a full day is enough — the count starts at the last check.
+    expect(isCheckDue(last, last + 24 * hour)).toBe(true);
   });
 });
